@@ -5,10 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(sources
         src/main.cpp
-        src/Ipv4.cpp
 )
 set(includes
-        include/Ipv4.h
+        include/Header.h
 
 )
 
