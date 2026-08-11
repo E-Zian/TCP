@@ -7,7 +7,8 @@ set(sources
         src/main.cpp
 )
 set(includes
-        include/Header.h
+        include/IPV4Header.h
+        include/Ipv4.h
 
 )
 
