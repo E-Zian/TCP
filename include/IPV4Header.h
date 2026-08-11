@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <ostream>
 #include <string>
+
 class IPv4Header {
     public:
     [[nodiscard]] uint8_t  version()      const { return version_ihl_ >> 4; }
@@ -52,6 +53,16 @@ std::ostream& operator<<(std::ostream& os, const IPv4Header& h) {
        << "Checksum: "            << h.checksum()                      << '\n'
        << "Source Address: "      << ip_to_string(h.source_addr())     << '\n'   // dotted-decimal
        << "Destination Address: " << ip_to_string(h.dest_addr())       << '\n';
+
     return os;
 }
+
+enum class protocol : uint8_t {
+    ICMP   = 1,    // ping and control messages (what you're replying to now)
+    IGMP   = 2,    // multicast group management
+    TCP    = 6,    // ← your eventual goal
+    UDP    = 17,   // 0x11 — connectionless datagrams
+    ICMPv6 = 58,   // 0x3a — the IPv6 chatter you saw earlier
+};
+
 #endif
