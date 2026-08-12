@@ -1,4 +1,5 @@
-#include "IPV4Header.h"
+#include "IPHeader.h"
+#include "Net.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -13,10 +14,6 @@
 #include <string>
 #include <system_error>
 #include <span>
-
-// Opens /dev/net/tun and attaches this program to the interface `dev`
-// (e.g. "tun0"). Returns a file descriptor you read()/write() packets on.
-// Throws std::system_error if anything goes wrong.
 
 namespace {
     int tun_alloc(const std::string &dev) {
@@ -39,21 +36,6 @@ namespace {
         return fd;
     }
 
-    uint16_t checksum(const std::span<const uint8_t> data) {
-        uint32_t sum{};
-        for (int i{}; i + 1 < data.size(); i += 2) {
-            sum += (data[i] << 8 | data[i + 1]);
-        }
-
-        if (data.size() & 1) {
-            sum += data[data.size() - 1] << 8;
-        }
-
-        while (sum >> 16) {
-            sum = (sum >> 16) + (sum & 0xffff);
-        }
-        return static_cast<uint16_t>(~sum);
-    }
 }
 
 int main() {
@@ -64,12 +46,13 @@ int main() {
     std::cout << "now listening for packets ... " << '\n';
 
     while (true) {
-        IPv4Header header{};
+        IPHeader ipHeader{};
         const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
 
-        std::memcpy(&header, buffer, sizeof(header));
-        if (header.version() != 4) {
-            std::cout << "header version " << header.version() << " not supported, proceeding to next packet" << '\n';
+        std::memcpy(&ipHeader, buffer, sizeof(ipHeader));
+
+        if (ipHeader.version() != 4) {
+            std::cout << "header version " << ipHeader.version() << " not supported, proceeding to next packet" << '\n';
             continue;
         }
 
@@ -87,10 +70,10 @@ int main() {
 
 
         std::cout << '\n';
-        std::cout << header << '\n';
+        std::cout << ipHeader << '\n';
 
-        if (header.protocol() == static_cast<uint8_t>(protocol::ICMP)) {
-            std::span<uint8_t> icmp{buffer + header.header_len(), buffer + header.total_length()};
+        if (ipHeader.protocol() == static_cast<uint8_t>(Net::protocol::ICMP)) {
+            std::span<uint8_t> icmp{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()};
             if (icmp[0] != 8) continue;
 
             icmp[0] = 0;
@@ -98,22 +81,20 @@ int main() {
             icmp[2] = 0;
             icmp[3] = 0;
 
-            const uint16_t checkSumVal{checksum(icmp)};
+            const uint16_t checkSumVal{Net::checksum(icmp)};
             icmp[2] = checkSumVal >> 8;
             icmp[3] = checkSumVal & 0xff;
 
             // swap source and destination
-            for (int i = 0; i < 4; ++i) {
-                uint8_t t = buffer[12 + i];
-                buffer[12 + i] = buffer[16 + i];
-                buffer[16 + i] = t;
-            }
+            Net::swapBytes(buffer+12,buffer+16,4);
 
             // Check sum for ip packet
-            buffer[10] = 0; buffer[11] = 0;
-            const uint16_t ipCk{ checksum({buffer, buffer + header.header_len()}) };
-            buffer[10] = ipCk >> 8;
-            buffer[11] = ipCk & 0xff;
+            // Resetting checksum
+            buffer[10] = 0;
+            buffer[11] = 0;
+            const uint16_t ipCs{ Net::checksum({buffer, buffer + ipHeader.header_len()}) };
+            buffer[10] = ipCs >> 8;
+            buffer[11] = ipCs & 0xff;
 
 
             ::write(tun0Fd, buffer, bytes);

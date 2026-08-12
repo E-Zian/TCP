@@ -7,8 +7,11 @@ set(sources
         src/main.cpp
 )
 set(includes
-        include/IPV4Header.h
-        include/Ipv4.h
+        include/IPHeader.h
+        include/Net.h
+        src/Net.cpp
+        include/Icmp.h
+        src/IPHeader.cpp
 
 )
 

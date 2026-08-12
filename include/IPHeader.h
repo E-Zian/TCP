@@ -6,16 +6,16 @@
 #include <ostream>
 #include <string>
 
-class IPv4Header {
+class IPHeader {
     public:
     [[nodiscard]] uint8_t  version()      const { return version_ihl_ >> 4; }
     [[nodiscard]] uint8_t  header_len()   const { return (version_ihl_ & 0x0F) * 4; }
-    [[nodiscard]] uint16_t total_length() const { return ntohs(total_length_); }   // convert once, here
+    [[nodiscard]] uint16_t total_length() const { return ntohs(total_length_); }
     [[nodiscard]] uint16_t id()           const { return ntohs(id_); }
-    [[nodiscard]] uint8_t  ttl()          const { return ttl_; }        // 1 byte → no conversion
-    [[nodiscard]] uint8_t  protocol()     const { return protocol_; }   // 1 byte → no conversion
+    [[nodiscard]] uint8_t  ttl()          const { return ttl_; }
+    [[nodiscard]] uint8_t  protocol()     const { return protocol_; }
     [[nodiscard]] uint16_t checksum()     const { return ntohs(checksum_); }
-    [[nodiscard]] uint32_t source_addr()  const { return source_addr_; }  // kept raw (see note)
+    [[nodiscard]] uint32_t source_addr()  const { return source_addr_; }
     [[nodiscard]] uint32_t dest_addr()    const { return dest_addr_; }
 
     private:
@@ -30,7 +30,7 @@ class IPv4Header {
     uint32_t source_addr_{};      // bytes 12–15
     uint32_t dest_addr_{};        // bytes 16–19
 
-    // small accessors for the packed first byte:
+    void swapSourceDestination();
 
 } __attribute__((packed));
 
@@ -42,7 +42,7 @@ static std::string ip_to_string(const uint32_t net_order) {
            std::to_string( x        & 0xFF);
 }
 
-std::ostream& operator<<(std::ostream& os, const IPv4Header& h) {
+inline std::ostream& operator<<(std::ostream& os, const IPHeader& h) {
     os << std::dec                                                   // ← force DECIMAL (std::hex is sticky!)
        << "Version: "             << static_cast<int>(h.version())    << '\n'   // cast uint8_t → int
        << "Header Length: "       << static_cast<int>(h.header_len()) << '\n'
@@ -56,13 +56,5 @@ std::ostream& operator<<(std::ostream& os, const IPv4Header& h) {
 
     return os;
 }
-
-enum class protocol : uint8_t {
-    ICMP   = 1,    // ping and control messages (what you're replying to now)
-    IGMP   = 2,    // multicast group management
-    TCP    = 6,    // ← your eventual goal
-    UDP    = 17,   // 0x11 — connectionless datagrams
-    ICMPv6 = 58,   // 0x3a — the IPv6 chatter you saw earlier
-};
 
 #endif
