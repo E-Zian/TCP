@@ -41,9 +41,7 @@ namespace {
 
 int main() {
     try {
-
-    constexpr int MTU{1500};
-    uint8_t buffer[MTU];
+    uint8_t buffer[Constants::MAX_TRANSMISSION_UNIT];
 
     const int tun0Fd{tun_alloc("tun0")};
     std::cout << "now listening for packets ... " << '\n';
@@ -53,7 +51,7 @@ int main() {
         IPHeader ipHeader{buffer};
 
         if (ipHeader.version() != 4) {
-            std::cout << "header version " << ipHeader.version() << " not supported, proceeding to next packet" << '\n';
+            std::cout << "Ip header version " << ipHeader.version() << " not supported, proceeding to next packet" << '\n';
             continue;
         }
 
@@ -62,7 +60,6 @@ int main() {
             return 1;
         }
 
-        std::cout << "Received packet of " << bytes << " bytes:\n";
         Net::displayBytes(ipHeader.get_data());
 
         std::cout << '\n';
@@ -78,7 +75,6 @@ int main() {
             ipHeader.swapSourceDestination();
 
             ipHeader.calculateChecksum();
-        std::cout << ipHeader << '\n';
 
             ::write(tun0Fd, ipHeader.get_data().data(), bytes);
             std::cout << "Reply sent for ping" <<'\n';

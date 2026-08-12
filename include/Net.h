@@ -23,4 +23,8 @@ namespace Net {
     void displayBytes(std::span<const uint8_t> bytes);
 }
 
+namespace Constants {
+    inline constexpr  size_t MAX_TRANSMISSION_UNIT {1500};
+}
+
 #endif //TCP_HELPER_H
