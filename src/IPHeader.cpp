@@ -2,8 +2,18 @@
 #include "Net.h"
 
 void IPHeader::swapSourceDestination() {
-    const uint32_t temp {source_addr_};
-    source_addr_ = dest_addr_;
-    dest_addr_ = temp;
+    Net::swapBytes(&data_[SourceAddr], &data_[DestAddr],4);
+}
+
+void IPHeader::resetChecksum() {
+    data_[Checksum] = 0;
+    data_[Checksum+1] = 0;
+}
+
+void IPHeader::calculateChecksum() {
+    resetChecksum();
+    const uint16_t checkSum{ Net::checksum(data_) };
+    data_[Checksum] = checkSum >> 8;
+    data_[Checksum+1] = checkSum & 0xff;
 }
 

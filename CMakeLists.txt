@@ -12,6 +12,7 @@ set(includes
         src/Net.cpp
         include/Icmp.h
         src/IPHeader.cpp
+        src/Icmp.cpp
 
 )
 

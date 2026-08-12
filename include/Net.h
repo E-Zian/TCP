@@ -19,7 +19,8 @@ namespace Net {
         UDP    = 17,
     };
 
-    void swapBytes(uint8_t* begin, uint8_t* target,size_t bytes);
+    void swapBytes(uint8_t* target1, uint8_t* target2,size_t bytes);
+    void displayBytes(std::span<const uint8_t> bytes);
 }
 
 #endif //TCP_HELPER_H

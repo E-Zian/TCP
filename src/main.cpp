@@ -1,5 +1,6 @@
 #include "IPHeader.h"
 #include "Net.h"
+#include "Icmp.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -39,6 +40,8 @@ namespace {
 }
 
 int main() {
+    try {
+
     constexpr int MTU{1500};
     uint8_t buffer[MTU];
 
@@ -46,10 +49,8 @@ int main() {
     std::cout << "now listening for packets ... " << '\n';
 
     while (true) {
-        IPHeader ipHeader{};
         const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
-
-        std::memcpy(&ipHeader, buffer, sizeof(ipHeader));
+        IPHeader ipHeader{buffer};
 
         if (ipHeader.version() != 4) {
             std::cout << "header version " << ipHeader.version() << " not supported, proceeding to next packet" << '\n';
@@ -62,43 +63,29 @@ int main() {
         }
 
         std::cout << "Received packet of " << bytes << " bytes:\n";
-        for (ssize_t i = 0; i < bytes; ++i) {
-            std::cout << std::hex << std::setw(2) << std::setfill('0')
-                    << static_cast<int>(buffer[i]) << ' ';
-            if ((i + 1) % 16 == 0) std::cout << '\n'; // 16 bytes per row
-        }
-
+        Net::displayBytes(ipHeader.get_data());
 
         std::cout << '\n';
         std::cout << ipHeader << '\n';
 
         if (ipHeader.protocol() == static_cast<uint8_t>(Net::protocol::ICMP)) {
-            std::span<uint8_t> icmp{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()};
-            if (icmp[0] != 8) continue;
+            Icmp icmp{{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()}};
+            if (icmp.type() != Icmp::RequestType::echo_request) continue;
 
-            icmp[0] = 0;
-            // Resetting check sum
-            icmp[2] = 0;
-            icmp[3] = 0;
+            icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
+            icmp.calculateChecksum();
 
-            const uint16_t checkSumVal{Net::checksum(icmp)};
-            icmp[2] = checkSumVal >> 8;
-            icmp[3] = checkSumVal & 0xff;
+            ipHeader.swapSourceDestination();
 
-            // swap source and destination
-            Net::swapBytes(buffer+12,buffer+16,4);
+            ipHeader.calculateChecksum();
+        std::cout << ipHeader << '\n';
 
-            // Check sum for ip packet
-            // Resetting checksum
-            buffer[10] = 0;
-            buffer[11] = 0;
-            const uint16_t ipCs{ Net::checksum({buffer, buffer + ipHeader.header_len()}) };
-            buffer[10] = ipCs >> 8;
-            buffer[11] = ipCs & 0xff;
-
-
-            ::write(tun0Fd, buffer, bytes);
+            ::write(tun0Fd, ipHeader.get_data().data(), bytes);
             std::cout << "Reply sent for ping" <<'\n';
         }
     }
+    }catch (std::system_error &e) {
+        std::perror(e.what());
+    }
+
 }
