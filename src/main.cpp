@@ -1,5 +1,6 @@
 #include "IPHeader.h"
 #include "Net.h"
+#include "Tcp.h"
 #include "Icmp.h"
 #include <fcntl.h>
 #include <unistd.h>
@@ -7,7 +8,6 @@
 #include <net/if.h>
 #include <linux/if_tun.h>
 #include <iostream>
-#include <iomanip>
 #include <cstring>
 #include <cerrno>
 #include <arpa/inet.h>
@@ -65,9 +65,11 @@ int main() {
 
             std::cout << '\n';
             std::cout << ipHeader << '\n';
+
+            const std::span<uint8_t> innerHeader{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()};
             switch (static_cast<Net::protocol>(ipHeader.protocol())) {
                 case Net::protocol::ICMP: {
-                    Icmp icmp{{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()}};
+                    Icmp icmp{innerHeader};
                     if (icmp.type() != Icmp::RequestType::echo_request) continue;
 
                     icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
@@ -83,6 +85,7 @@ int main() {
 
                 }
                 case Net::protocol::TCP: {
+                    Tcp tcp{innerHeader,ipHeader.source_addr(),ipHeader.dest_addr()};
                     break;
 
                 }

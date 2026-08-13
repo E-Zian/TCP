@@ -3,6 +3,15 @@
 #include <span>
 #include <vector>
 #include <arpa/inet.h>
+#include <random>
+
+namespace {
+    uint32_t randomIsn() {
+        static std::mt19937 gen{std::random_device{}()};   // seeded once
+        std::uniform_int_distribution<uint32_t> dist;       // default range = full uint32_t
+        return dist(gen);
+    }
+}
 
 void Tcp::swapSourceDestPort() {
     Net::swapBytes(&data_[SourcePort], &data_[DestPort], 2);
