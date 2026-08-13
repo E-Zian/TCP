@@ -79,8 +79,12 @@ int main() {
 
                     ::write(tun0Fd, ipHeader.get_data().data(), bytes);
                     std::cout << "Reply sent for ping" << '\n';
+                    break;
+
                 }
                 case Net::protocol::TCP: {
+                    break;
+
                 }
                 default:
                     std::cout << "Unrecognised Protocol" << '\n';
