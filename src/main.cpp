@@ -36,52 +36,58 @@ namespace {
 
         return fd;
     }
-
 }
 
 int main() {
     try {
-    uint8_t buffer[Constants::MAX_TRANSMISSION_UNIT];
+        uint8_t buffer[Constants::MAX_TRANSMISSION_UNIT];
 
-    const int tun0Fd{tun_alloc("tun0")};
-    std::cout << "now listening for packets ... " << '\n';
+        const int tun0Fd{tun_alloc("tun0")};
 
-    while (true) {
-        const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
-        IPHeader ipHeader{buffer};
+        std::cout << "now listening for packets ... " << '\n';
 
-        if (ipHeader.version() != 4) {
-            std::cout << "Ip header version " << ipHeader.version() << " not supported, proceeding to next packet" << '\n';
-            continue;
+        while (true) {
+            const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
+            IPHeader ipHeader{buffer};
+
+            if (ipHeader.version() != 4) {
+                std::cout << "Ip header version " << ipHeader.version() << " not supported, proceeding to next packet"
+                        << '\n';
+                continue;
+            }
+
+            if (bytes < 0) {
+                std::perror("read");
+                return 1;
+            }
+
+            Net::displayBytes(ipHeader.get_data());
+
+            std::cout << '\n';
+            std::cout << ipHeader << '\n';
+            switch (static_cast<Net::protocol>(ipHeader.protocol())) {
+                case Net::protocol::ICMP: {
+                    Icmp icmp{{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()}};
+                    if (icmp.type() != Icmp::RequestType::echo_request) continue;
+
+                    icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
+                    icmp.calculateChecksum();
+
+                    ipHeader.swapSourceDestination();
+
+                    ipHeader.calculateChecksum();
+
+                    ::write(tun0Fd, ipHeader.get_data().data(), bytes);
+                    std::cout << "Reply sent for ping" << '\n';
+                }
+                case Net::protocol::TCP: {
+                }
+                default:
+                    std::cout << "Unrecognised Protocol" << '\n';
+                    break;
+            }
         }
-
-        if (bytes < 0) {
-            std::perror("read");
-            return 1;
-        }
-
-        Net::displayBytes(ipHeader.get_data());
-
-        std::cout << '\n';
-        std::cout << ipHeader << '\n';
-
-        if (ipHeader.protocol() == static_cast<uint8_t>(Net::protocol::ICMP)) {
-            Icmp icmp{{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()}};
-            if (icmp.type() != Icmp::RequestType::echo_request) continue;
-
-            icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
-            icmp.calculateChecksum();
-
-            ipHeader.swapSourceDestination();
-
-            ipHeader.calculateChecksum();
-
-            ::write(tun0Fd, ipHeader.get_data().data(), bytes);
-            std::cout << "Reply sent for ping" <<'\n';
-        }
-    }
-    }catch (std::system_error &e) {
+    } catch (std::system_error &e) {
         std::perror(e.what());
     }
-
 }

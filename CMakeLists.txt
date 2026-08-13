@@ -13,6 +13,8 @@ set(includes
         include/Icmp.h
         src/IPHeader.cpp
         src/Icmp.cpp
+        src/Tcp.cpp
+        include/Tcp.h
 
 )
 
