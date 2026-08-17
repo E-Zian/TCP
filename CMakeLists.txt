@@ -7,17 +7,20 @@ set(sources
         src/main.cpp
 )
 set(includes
-        include/IPHeader.h
+        include/protocol/Ip.h
         include/Net.h
         src/Net.cpp
-        include/Icmp.h
-        src/IPHeader.cpp
-        src/Icmp.cpp
-        src/Tcp.cpp
-        include/Tcp.h
+        include/protocol/Icmp.h
+        src/protocol/Ip.cpp
+        src/protocol/Icmp.cpp
+        src/protocol/Tcp.cpp
+        include/protocol/Tcp.h
 
 )
 
 add_executable(TCP ${sources} ${includes})
 
-target_include_directories(TCP PUBLIC include )
+target_include_directories(TCP PUBLIC
+        include
+
+)

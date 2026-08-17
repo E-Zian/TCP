@@ -1,7 +1,7 @@
-#include "IPHeader.h"
+#include "protocol/Ip.h"
 #include "Net.h"
-#include "Tcp.h"
-#include "Icmp.h"
+#include "protocol/Tcp.h"
+#include "protocol/Icmp.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -48,7 +48,7 @@ int main() {
 
         while (true) {
             const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
-            IPHeader ipHeader{buffer};
+            Ip ipHeader{buffer};
 
             if (ipHeader.version() != 4) {
                 std::cout << "Ip header version " << ipHeader.version() << " not supported, proceeding to next packet"

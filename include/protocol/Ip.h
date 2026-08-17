@@ -7,9 +7,9 @@
 #include <span>
 #include <string>
 
-class IPHeader {
+class Ip {
 public:
-    explicit IPHeader(const std::span<uint8_t> data) {
+    explicit Ip(const std::span<uint8_t> data) {
         data_ = {data.begin(), data.begin()+(data[TotalLength] << 8 | data[TotalLength+1])};
     };
 
@@ -64,7 +64,7 @@ static std::string ip_to_string(const uint32_t address) {
            std::to_string(address & 0xFF);
 }
 
-inline std::ostream &operator<<(std::ostream &os, const IPHeader &h) {
+inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
     os << std::dec // ← force DECIMAL (std::hex is sticky!)
             << "Version: " << static_cast<int>(h.version()) << '\n' // cast uint8_t → int
             << "Header Length: " << static_cast<int>(h.header_len()) << '\n'
