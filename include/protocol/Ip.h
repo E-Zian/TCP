@@ -1,15 +1,15 @@
 #ifndef IPV4_H
 #define IPV4_H
-#include <cstdint>
+#include "Net.h"
 #include <iosfwd>
 #include <netinet/in.h>
 #include <ostream>
 #include <span>
 #include <string>
 
-class IPHeader {
+class Ip {
 public:
-    explicit IPHeader(const std::span<uint8_t> data) {
+    explicit Ip(const std::span<uint8_t> data) {
         data_ = {data.begin(), data.begin()+(data[TotalLength] << 8 | data[TotalLength+1])};
     };
 
@@ -47,24 +47,21 @@ public:
         return data_;
     }
     void swapSourceDestination();
-    void calculateChecksum();
+    uint16_t calculateCheckSum();
+
+    bool validateCheckSum();
 
 private:
     std::span<uint8_t> data_;
 
 
-    void resetChecksum();
+    void resetCheckSum();
 
 };
 
-static std::string ip_to_string(const uint32_t address) {
-    return std::to_string((address >> 24) & 0xFF) + '.' +
-           std::to_string((address >> 16) & 0xFF) + '.' +
-           std::to_string((address >> 8) & 0xFF) + '.' +
-           std::to_string(address & 0xFF);
-}
 
-inline std::ostream &operator<<(std::ostream &os, const IPHeader &h) {
+
+inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
     os << std::dec // ← force DECIMAL (std::hex is sticky!)
             << "Version: " << static_cast<int>(h.version()) << '\n' // cast uint8_t → int
             << "Header Length: " << static_cast<int>(h.header_len()) << '\n'
@@ -73,8 +70,8 @@ inline std::ostream &operator<<(std::ostream &os, const IPHeader &h) {
             << "TTL: " << static_cast<int>(h.ttl()) << '\n'
             << "Protocol: " << static_cast<int>(h.protocol()) << '\n'
             << "Checksum: " << h.checksum() << '\n'
-            << "Source Address: " << ip_to_string(h.source_addr()) << '\n' // dotted-decimal
-            << "Destination Address: " << ip_to_string(h.dest_addr()) << '\n';
+            << "Source Address: " << Net::ip_to_string(h.source_addr()) << '\n' // dotted-decimal
+            << "Destination Address: " << Net::ip_to_string(h.dest_addr()) << '\n';
 
     return os;
 }

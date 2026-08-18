@@ -25,3 +25,7 @@ sudo ip link set tun0 up
 
 echo ""
 echo "Done. tun0 is ready. You can now Run the program."
+echo ""
+echo "Running tcpdump to view the packets travelling through tun0."
+echo ""
+sudo tcpdump -i tun0 -n -v
