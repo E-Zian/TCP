@@ -34,3 +34,10 @@ void Net::displayBytes(const std::span<const uint8_t> bytes) {
         if ((i + 1) % 16 == 0) std::cout << '\n'; // 16 bytes per row
     }
 };
+
+std::string Net::ip_to_string(const uint32_t address) {
+    return std::to_string((address >> 24) & 0xFF) + '.' +
+           std::to_string((address >> 16) & 0xFF) + '.' +
+           std::to_string((address >> 8) & 0xFF) + '.' +
+           std::to_string(address & 0xFF);
+}

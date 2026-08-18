@@ -48,6 +48,17 @@ int main() {
 
         while (true) {
             const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
+
+            if (bytes < 0 ) {
+                std::perror("read");
+                return 1;
+            }
+
+            if (bytes < 20) {
+                std::perror("read bytes too short");
+                return 1;
+            };
+
             Ip ipHeader{buffer};
 
             if (ipHeader.version() != 4) {
@@ -56,10 +67,7 @@ int main() {
                 continue;
             }
 
-            if (bytes < 0) {
-                std::perror("read");
-                return 1;
-            }
+
 
             Net::displayBytes(ipHeader.get_data());
 
@@ -77,7 +85,7 @@ int main() {
 
                     ipHeader.swapSourceDestination();
 
-                    ipHeader.calculateChecksum();
+                    ipHeader.calculateCheckSum();
 
                     ::write(tun0Fd, ipHeader.get_data().data(), bytes);
                     std::cout << "Reply sent for ping" << '\n';
@@ -85,7 +93,10 @@ int main() {
 
                 }
                 case Net::protocol::TCP: {
-                    Tcp tcp{innerHeader,ipHeader.source_addr(),ipHeader.dest_addr()};
+                    Tcp tcp{innerHeader,ipHeader.source_addr(),ipHeader.dest_addr(),tun0Fd};
+
+
+
                     break;
 
                 }
