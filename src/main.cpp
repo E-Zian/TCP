@@ -100,13 +100,11 @@ int main() {
                         break;
                     }
 
-                    std::vector<uint8_t> receivedData_{};
-
                     uint32_t sequenceNumber{Tcp::randomIsn()};
 
                     // syn-ack
                     tcp.swapSourceDestPort();
-                    tcp.setAck(tcp.getSequenceNumberReceived() + 1);
+                    tcp.setAck(tcp.getSeqNumber() + 1);
                     tcp.setSeq(sequenceNumber);
                     tcp.setFlag(Tcp::Flag::ACK);
                     tcp.setWindow(std::numeric_limits<uint16_t>::max());

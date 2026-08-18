@@ -56,12 +56,19 @@ public:
         data_[Flags] = data_[Flags] | static_cast<uint8_t>(flag);
     };
 
+    [[nodiscard]] uint16_t getSourcePort() const {
+        return data_[SourcePort] << 8 | data_[SourcePort + 1];
+    };
 
-    [[nodiscard]] uint32_t getDataSeqNumber() const {
+    [[nodiscard]] uint16_t getDestPort() const {
+        return data_[DestPort] << 8 | data_[DestPort + 1];
+    }
+
+    [[nodiscard]] uint32_t getSeqNumber() const {
         return static_cast<uint32_t>(data_[SeqNum] << 24) | data_[SeqNum + 1] << 16 | data_[SeqNum + 2] << 8 | data_[SeqNum + 3];
     };
 
-    [[nodiscard]] uint32_t getDataAckNumber() const {
+    [[nodiscard]] uint32_t getAckNumber() const {
         return static_cast<uint32_t>(data_[AckNum] << 24) | data_[AckNum + 1] << 16 | data_[AckNum + 2] << 8 | data_[AckNum + 3];
     };
 
@@ -91,14 +98,6 @@ public:
         data_[AckNum + 3] = AcknowledgementNumber;
     }
 
-    uint32_t getSequenceNumberReceived() const {
-        return seqNumReceived_;
-    }
-
-    uint32_t getAckNumberReceived() const {
-        return ackNumReceived_;
-    }
-
     void setWindow(const uint16_t windowSize) {
         data_[Window]     = windowSize >> 8;
         data_[Window + 1] = windowSize;
@@ -106,12 +105,19 @@ public:
 
     static uint32_t randomIsn();
 
+    [[nodiscard]] uint32_t getSourceIP() const {
+        return sourceIP_;
+    };
+
+    [[nodiscard]] uint32_t getDestinationIP() const {
+        return destinationIP_;
+    };
+
+
 private:
     std::span<uint8_t> data_;
     uint32_t sourceIP_;
     uint32_t destinationIP_;
-    uint32_t seqNumReceived_;
-    uint32_t ackNumReceived_;
 
 };
 #endif //TCP_TCP_H

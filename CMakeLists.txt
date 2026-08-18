@@ -15,6 +15,8 @@ set(includes
         src/protocol/Icmp.cpp
         src/protocol/Tcp.cpp
         include/protocol/Tcp.h
+        src/state/TcpConnection.cpp
+        include/state/TcpConnection.h
 
 )
 
