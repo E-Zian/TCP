@@ -38,7 +38,7 @@ public:
         URG = 0x20,
     };
 
-    Tcp(std::span<uint8_t> data,uint32_t sourceIP,uint32_t destinationIP,int tunDeviceFD);
+    Tcp(std::span<uint8_t> data,uint32_t sourceIP,uint32_t destinationIP);
 
     void swapSourceDestPort();
 
@@ -46,17 +46,22 @@ public:
 
     void reject();
 
-    void resetFlags();
-
-    void setFlag(Flag flag);
-
     bool validateCheckSum();
 
-    [[nodiscard]] uint32_t getSeqNumber() const {
+    void resetFlags(){
+        data_[Flags] = 0;
+    };
+
+    void setFlag(const Flag flag){
+        data_[Flags] = data_[Flags] | static_cast<uint8_t>(flag);
+    };
+
+
+    [[nodiscard]] uint32_t getDataSeqNumber() const {
         return static_cast<uint32_t>(data_[SeqNum] << 24) | data_[SeqNum + 1] << 16 | data_[SeqNum + 2] << 8 | data_[SeqNum + 3];
     };
 
-    [[nodiscard]] uint32_t getAckNumber() const {
+    [[nodiscard]] uint32_t getDataAckNumber() const {
         return static_cast<uint32_t>(data_[AckNum] << 24) | data_[AckNum + 1] << 16 | data_[AckNum + 2] << 8 | data_[AckNum + 3];
     };
 
@@ -86,17 +91,27 @@ public:
         data_[AckNum + 3] = AcknowledgementNumber;
     }
 
+    uint32_t getSequenceNumberReceived() const {
+        return seqNumReceived_;
+    }
+
+    uint32_t getAckNumberReceived() const {
+        return ackNumReceived_;
+    }
+
+    void setWindow(const uint16_t windowSize) {
+        data_[Window]     = windowSize >> 8;
+        data_[Window + 1] = windowSize;
+    }
+
+    static uint32_t randomIsn();
+
 private:
     std::span<uint8_t> data_;
     uint32_t sourceIP_;
     uint32_t destinationIP_;
-    const int tunDeviceFD_;
-    uint32_t seqNum_;
-    uint32_t ackNum_;
-    std::vector<uint8_t> receivedData_{};
-    uint32_t clientSeqNum_;
-    uint32_t clientAckNum_;
+    uint32_t seqNumReceived_;
+    uint32_t ackNumReceived_;
 
-    // void sendSynAck();
 };
 #endif //TCP_TCP_H

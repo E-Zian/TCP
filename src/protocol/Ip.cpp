@@ -12,7 +12,7 @@ void Ip::resetCheckSum() {
 
 uint16_t Ip::calculateCheckSum() {
     resetCheckSum();
-    const uint16_t checkSum{ Net::checksum(data_) };
+    const uint16_t checkSum{ Net::checksum(data_.first(header_len())) };
     data_[Checksum] = checkSum >> 8;
     data_[Checksum+1] = checkSum & 0xff;
     return checkSum;

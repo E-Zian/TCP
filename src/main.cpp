@@ -15,6 +15,7 @@
 #include <string>
 #include <system_error>
 #include <span>
+#include <limits>
 
 namespace {
     int tun_alloc(const std::string &dev) {
@@ -49,24 +50,23 @@ int main() {
         while (true) {
             const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
 
-            if (bytes < 0 ) {
+            if (bytes < 0) {
                 std::perror("read");
                 return 1;
             }
 
             if (bytes < 20) {
                 std::perror("read bytes too short");
-                return 1;
+                continue;
             };
 
-            Ip ipHeader{buffer};
-
-            if (ipHeader.version() != 4) {
-                std::cout << "Ip header version " << ipHeader.version() << " not supported, proceeding to next packet"
+            if (const uint8_t ipHeaderVersion{static_cast<uint8_t>(buffer[Ip::Offset::VersionIhl] >> 4)}; ipHeaderVersion != 4) {
+                std::cout << "Ip header version " << static_cast<int>(ipHeaderVersion) << " not supported, proceeding to next packet"
                         << '\n';
                 continue;
             }
 
+            Ip ipHeader{buffer};
 
 
             Net::displayBytes(ipHeader.get_data());
@@ -88,17 +88,37 @@ int main() {
                     ipHeader.calculateCheckSum();
 
                     ::write(tun0Fd, ipHeader.get_data().data(), bytes);
-                    std::cout << "Reply sent for ping" << '\n';
-                    break;
 
+                    std::cout << "\nPing reply sent\n";
+                    break;
                 }
                 case Net::protocol::TCP: {
-                    Tcp tcp{innerHeader,ipHeader.source_addr(),ipHeader.dest_addr(),tun0Fd};
+                    Tcp tcp{innerHeader, ipHeader.source_addr(), ipHeader.dest_addr()};
+                    if (tcp.getFlags() & (Tcp::Flag::FIN | Tcp::Flag::RST | Tcp::Flag::PSH | Tcp::Flag::ACK |
+                                          Tcp::Flag::URG) || !(tcp.getFlags() & (Tcp::Flag::SYN))) {
+                        tcp.reject();
+                        break;
+                    }
 
+                    std::vector<uint8_t> receivedData_{};
 
+                    uint32_t sequenceNumber{Tcp::randomIsn()};
+
+                    // syn-ack
+                    tcp.swapSourceDestPort();
+                    tcp.setAck(tcp.getSequenceNumberReceived() + 1);
+                    tcp.setSeq(sequenceNumber);
+                    tcp.setFlag(Tcp::Flag::ACK);
+                    tcp.setWindow(std::numeric_limits<uint16_t>::max());
+                    tcp.calculateCheckSum();
+
+                    ipHeader.swapSourceDestination();
+
+                    ipHeader.calculateCheckSum();
+
+                    ::write(tun0Fd, ipHeader.get_data().data(), bytes);
 
                     break;
-
                 }
                 default:
                     std::cout << "Unrecognised Protocol" << '\n';

@@ -1,0 +1,1 @@
+sudo tcpdump -i tun0 -n -v

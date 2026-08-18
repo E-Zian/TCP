@@ -7,30 +7,22 @@
 #include <unistd.h>
 
 namespace {
-    uint32_t randomIsn() {
-        static std::mt19937 gen{std::random_device{}()};
-        std::uniform_int_distribution<uint32_t> dist;
-        return dist(gen);
-    }
+
 
     const std::string serverPayload{"Hi This is a test"};
 }
 
-Tcp::Tcp(const std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destinationIP,
-         const int tunDeviceFD) : data_{data},
-                                  sourceIP_{sourceIP},
-                                  destinationIP_{destinationIP},
-                                  tunDeviceFD_{tunDeviceFD},
-                                  seqNum_{randomIsn()},
-                                  ackNum_{getSeqNumber()},
-                                  clientSeqNum_{getSeqNumber()},
-                                  clientAckNum_{getAckNumber()} {
-    if (getFlags() & (FIN | RST | PSH | ACK | URG) || !(getFlags() & (SYN))) {
-        reject();
-        return;
-    }
+uint32_t Tcp::randomIsn() {
+    static std::mt19937 gen{std::random_device{}()};
+    std::uniform_int_distribution<uint32_t> dist;
+    return dist(gen);
+}
 
-    sendSynAck();
+Tcp::Tcp(const std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destinationIP) : data_{data},
+    sourceIP_{sourceIP},
+    destinationIP_{destinationIP},
+    seqNumReceived_{getDataSeqNumber()},
+    ackNumReceived_{getDataAckNumber()} {
 };
 
 void Tcp::swapSourceDestPort() {
@@ -73,27 +65,9 @@ void Tcp::reject() {
     calculateCheckSum();
 }
 
-void Tcp::resetFlags() {
-    data_[Flags] = 0;
-}
-
-void Tcp::setFlag(const Flag flag) {
-    data_[Flags] = data_[Flags] | static_cast<uint8_t>(flag);
-}
-
 bool Tcp::validateCheckSum() {
     const uint16_t checkSum{static_cast<uint16_t>(data_[Checksum] << 8 | data_[Checksum + 1])};
     const uint16_t calculatedCheckSum{calculateCheckSum()};
 
     return checkSum == calculatedCheckSum;
 }
-
-// void Tcp::sendSynAck() {
-//     ackNum_ += 1;
-//     swapSourceDestPort();
-//     setAck(ackNum_);
-//     setSeq(seqNum_);
-//     calculateCheckSum();
-//
-//     ::write(tunDeviceFD_, data_.data(), data_.size());
-// }
