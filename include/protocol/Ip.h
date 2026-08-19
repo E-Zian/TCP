@@ -9,7 +9,7 @@
 
 class Ip {
 public:
-    explicit Ip(const std::span<uint8_t> data) {
+    Ip(const std::span<uint8_t> data,const int tunFd) :tunFd_(tunFd) {
         data_ = {data.begin(), data.begin()+(data[TotalLength] << 8 | data[TotalLength+1])};
     };
 
@@ -46,31 +46,32 @@ public:
     [[nodiscard]] std::span<const uint8_t> get_data() const {
         return data_;
     }
-    void swapSourceDestination();
-    uint16_t calculateCheckSum();
+
+    void reply();
 
     bool validateCheckSum();
 
 private:
     std::span<uint8_t> data_;
-
+    const int tunFd_;
 
     void resetCheckSum();
-
+    void swapSourceDestination();
+    uint16_t calculateCheckSum();
 };
 
 
 
 inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
-    os << std::dec // ← force DECIMAL (std::hex is sticky!)
-            << "Version: " << static_cast<int>(h.version()) << '\n' // cast uint8_t → int
+    os << std::dec
+            << "Version: " << static_cast<int>(h.version()) << '\n'
             << "Header Length: " << static_cast<int>(h.header_len()) << '\n'
             << "Total Length: " << h.total_length() << '\n'
             << "ID: " << h.id() << '\n'
             << "TTL: " << static_cast<int>(h.ttl()) << '\n'
             << "Protocol: " << static_cast<int>(h.protocol()) << '\n'
             << "Checksum: " << h.checksum() << '\n'
-            << "Source Address: " << Net::ip_to_string(h.source_addr()) << '\n' // dotted-decimal
+            << "Source Address: " << Net::ip_to_string(h.source_addr()) << '\n'
             << "Destination Address: " << Net::ip_to_string(h.dest_addr()) << '\n';
 
     return os;

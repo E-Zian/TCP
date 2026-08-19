@@ -2,33 +2,36 @@
 #ifndef TCP_TCPCONNECTION_H
 #define TCP_TCPCONNECTION_H
 #include "protocol/Tcp.h"
+#include "protocol/Ip.h"
+#include "model/ConnectionKey.h"
 #include <vector>
 #include <cstdint>
 
 class TcpConnection {
 public:
-    explicit TcpConnection(const Tcp& tcp);
 
-    enum class State { Listen, SynReceived, Established };
+    enum class State { Listen, SynReceived, Established, Closed };
 
-    void handleTcpPacket(Tcp& tcp);
+    void handlePacket(Ip& ip,Tcp& tcp);
 
+    void abortConnection(Ip &ip, Tcp &tcp);
+
+    [[nodiscard]] State getState() const {
+        return state_;
+    }
 private:
-    State state{State::Listen};
+    State state_{State::Listen};
 
-    uint32_t remoteIp_;
-    uint16_t remotePort_;
-    uint32_t localIp_;
-    uint16_t localPort_;
+    ConnectionKey connectionKey_{};
 
-    uint32_t myNextSequence_;
-    uint32_t myNextExpectedSequence_;
+    uint32_t mySeqNumber_{};
+    uint32_t myAckNumber_{};
 
-    uint16_t myWindow_;
-    uint16_t theirWindow_;
+    uint16_t myWindow_{};
+    uint16_t theirWindow_{};
 
-    std::vector<uint8_t> receivedBuffer_{};
-    std::vector<uint8_t> sendBuffer_{};
+    std::vector<uint8_t> receivedBuffer_;
+    std::vector<uint8_t> sendBuffer_;
 
 };
 

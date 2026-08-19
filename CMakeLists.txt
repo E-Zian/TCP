@@ -5,18 +5,22 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(sources
         src/main.cpp
+        src/Net.cpp
+        src/protocol/Ip.cpp
+        src/protocol/Icmp.cpp
+        src/protocol/Tcp.cpp
+        src/state/TcpConnection.cpp
+        src/state/TcpConnectionTable.cpp
+
 )
 set(includes
         include/protocol/Ip.h
         include/Net.h
-        src/Net.cpp
         include/protocol/Icmp.h
-        src/protocol/Ip.cpp
-        src/protocol/Icmp.cpp
-        src/protocol/Tcp.cpp
         include/protocol/Tcp.h
-        src/state/TcpConnection.cpp
         include/state/TcpConnection.h
+        include/state/TcpConnectionTable.h
+        include/model/ConnectionKey.h
 
 )
 

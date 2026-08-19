@@ -1,4 +1,7 @@
 #include "protocol/Ip.h"
+
+#include <unistd.h>
+
 #include "Net.h"
 
 void Ip::swapSourceDestination() {
@@ -16,6 +19,12 @@ uint16_t Ip::calculateCheckSum() {
     data_[Checksum] = checkSum >> 8;
     data_[Checksum+1] = checkSum & 0xff;
     return checkSum;
+}
+
+void Ip::reply() {
+    swapSourceDestination();
+    calculateCheckSum();
+    ::write(tunFd_, data_.data(), data_.size_bytes());
 }
 
 bool Ip::validateCheckSum() {
