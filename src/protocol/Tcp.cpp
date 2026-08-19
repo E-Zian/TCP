@@ -63,7 +63,7 @@ uint16_t Tcp::calculateCheckSum() {
     return checkSumValue;
 }
 
-void Tcp::reject() {
+void Tcp::abort() {
     swapSourceDestPort();
     resetFlags();
     setFlag(RST);

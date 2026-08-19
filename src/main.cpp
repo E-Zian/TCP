@@ -100,7 +100,12 @@ int main() {
                         tcpTable.addConnection(connectionKey, connection);
                     }
 
-                    tcpTable.getConnection(connectionKey)->handlePacket(ipPacket, tcp);
+                    TcpConnection &connection{*tcpTable.getConnection(connectionKey)};
+                    connection.handlePacket(ipPacket, tcp);
+
+                    if (connection.getState() == TcpConnection::State::Closed) {
+                        tcpTable.removeConnection(connectionKey);
+                    }
 
                     break;
                 }

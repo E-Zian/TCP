@@ -18,6 +18,8 @@ class TcpConnectionTable {
 
     TcpConnection* getConnection(const ConnectionKey& connectionKey);
 
+    void removeConnection(const ConnectionKey& connectionKey);
+
     private:
     std::unordered_map<ConnectionKey, TcpConnection> connectionTable_;
 };

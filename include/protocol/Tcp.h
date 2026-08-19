@@ -45,7 +45,7 @@ public:
 
     uint16_t calculateCheckSum();
 
-    void reject();
+    void abort();
 
     bool validateCheckSum();
 

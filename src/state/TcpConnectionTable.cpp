@@ -20,5 +20,9 @@ TcpConnection * TcpConnectionTable::getConnection(const ConnectionKey &connectio
     return &(it->second);
 }
 
+void TcpConnectionTable::removeConnection(const ConnectionKey &connectionKey) {
+    connectionTable_.erase(connectionKey);
+}
+
 
 

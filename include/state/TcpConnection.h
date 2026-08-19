@@ -10,10 +10,15 @@
 class TcpConnection {
 public:
 
-    enum class State { Listen, SynReceived, Established };
+    enum class State { Listen, SynReceived, Established, Closed };
 
     void handlePacket(Ip& ip,Tcp& tcp);
 
+    void abortConnection(Ip &ip, Tcp &tcp);
+
+    [[nodiscard]] State getState() const {
+        return state_;
+    }
 private:
     State state_{State::Listen};
 
