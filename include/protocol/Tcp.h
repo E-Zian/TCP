@@ -2,6 +2,7 @@
 #ifndef TCP_TCP_H
 #define TCP_TCP_H
 
+#include "model/ConnectionKey.h"
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -113,6 +114,7 @@ public:
         return destinationIP_;
     };
 
+    [[nodiscard]] ConnectionKey getConnectionKey() const;
 
 private:
     std::span<uint8_t> data_;

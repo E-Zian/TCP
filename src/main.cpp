@@ -1,5 +1,6 @@
 #include "protocol/Ip.h"
 #include "Net.h"
+#include "state/TcpConnectionTable.h"
 #include "protocol/Tcp.h"
 #include "protocol/Icmp.h"
 #include <fcntl.h>
@@ -15,7 +16,6 @@
 #include <string>
 #include <system_error>
 #include <span>
-#include <limits>
 
 namespace {
     int tun_alloc(const std::string &dev) {
@@ -41,6 +41,8 @@ namespace {
 
 int main() {
     try {
+        TcpConnectionTable tcpTable{};
+
         uint8_t buffer[Constants::MAX_TRANSMISSION_UNIT];
 
         const int tun0Fd{tun_alloc("tun0")};
@@ -60,14 +62,15 @@ int main() {
                 continue;
             };
 
-            if (const uint8_t ipHeaderVersion{static_cast<uint8_t>(buffer[Ip::Offset::VersionIhl] >> 4)}; ipHeaderVersion != 4) {
-                std::cout << "Ip header version " << static_cast<int>(ipHeaderVersion) << " not supported, proceeding to next packet"
+            if (const uint8_t ipHeaderVersion{static_cast<uint8_t>(buffer[Ip::Offset::VersionIhl] >> 4)};
+                ipHeaderVersion != 4) {
+                std::cout << "Ip header version " << static_cast<int>(ipHeaderVersion) <<
+                        " not supported, proceeding to next packet"
                         << '\n';
                 continue;
             }
 
-            Ip ipHeader{buffer};
-
+            Ip ipHeader{buffer, tun0Fd};
 
             Net::displayBytes(ipHeader.get_data());
 
@@ -83,38 +86,21 @@ int main() {
                     icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
                     icmp.calculateChecksum();
 
-                    ipHeader.swapSourceDestination();
-
-                    ipHeader.calculateCheckSum();
-
-                    ::write(tun0Fd, ipHeader.get_data().data(), bytes);
+                    ipHeader.reply();
 
                     std::cout << "\nPing reply sent\n";
                     break;
                 }
                 case Net::protocol::TCP: {
                     Tcp tcp{innerHeader, ipHeader.source_addr(), ipHeader.dest_addr()};
-                    if (tcp.getFlags() & (Tcp::Flag::FIN | Tcp::Flag::RST | Tcp::Flag::PSH | Tcp::Flag::ACK |
-                                          Tcp::Flag::URG) || !(tcp.getFlags() & (Tcp::Flag::SYN))) {
-                        tcp.reject();
-                        break;
+                    ConnectionKey connectionKey{tcp.getConnectionKey()};
+
+                    if (!tcpTable.checkExistingConnection(connectionKey)) {
+                        TcpConnection connection{};
+                        tcpTable.addConnection(connectionKey, connection);
                     }
 
-                    uint32_t sequenceNumber{Tcp::randomIsn()};
-
-                    // syn-ack
-                    tcp.swapSourceDestPort();
-                    tcp.setAck(tcp.getSeqNumber() + 1);
-                    tcp.setSeq(sequenceNumber);
-                    tcp.setFlag(Tcp::Flag::ACK);
-                    tcp.setWindow(std::numeric_limits<uint16_t>::max());
-                    tcp.calculateCheckSum();
-
-                    ipHeader.swapSourceDestination();
-
-                    ipHeader.calculateCheckSum();
-
-                    ::write(tun0Fd, ipHeader.get_data().data(), bytes);
+                    tcpTable.getConnection(connectionKey)->handlePacket(ipHeader, tcp);
 
                     break;
                 }

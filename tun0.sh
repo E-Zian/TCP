@@ -20,11 +20,14 @@ sudo ip tuntap add dev tun0 mode tun user "$(whoami)"
 # 2. Give the card an address so Linux routes 10.0.0.x traffic to it.
 sudo ip addr add 10.0.0.1/24 dev tun0
 
+# Disable IPv6 on tun0 so the kernel stops sending IPv6 router solicitations.
+sudo sysctl -w net.ipv6.conf.tun0.disable_ipv6=1
+
 # 3. Turn the card on.
 sudo ip link set tun0 up
 
 echo ""
-echo "Done. tun0 is ready. You can now Run the program."
+echo "tun0 has been set up. You can now Run the program."
 echo ""
 echo "Running tcpdump to view the packets travelling through tun0."
 echo ""

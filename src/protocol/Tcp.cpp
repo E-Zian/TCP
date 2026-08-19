@@ -7,8 +7,6 @@
 #include <unistd.h>
 
 namespace {
-
-
     const std::string serverPayload{"Hi This is a test"};
 }
 
@@ -18,11 +16,18 @@ uint32_t Tcp::randomIsn() {
     return dist(gen);
 }
 
+ConnectionKey Tcp::getConnectionKey() const {
+    ConnectionKey connectionKey{};
+    connectionKey.remoteIp = getSourceIP();
+    connectionKey.remotePort = getSourcePort();
+    connectionKey.localIp = getDestinationIP();
+    connectionKey.localPort = getDestPort();
+    return connectionKey;
+}
+
 Tcp::Tcp(const std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destinationIP) : data_{data},
     sourceIP_{sourceIP},
-    destinationIP_{destinationIP},
-    seqNumReceived_{getDataSeqNumber()},
-    ackNumReceived_{getDataAckNumber()} {
+    destinationIP_{destinationIP} {
 };
 
 void Tcp::swapSourceDestPort() {
