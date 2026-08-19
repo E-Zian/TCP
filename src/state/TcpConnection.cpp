@@ -1,9 +1,10 @@
 #include "state/TcpConnection.h"
 #include <limits>
 #include <cstdint>
+#include <iostream>
 
 
-void TcpConnection::handlePacket(Ip& ip,Tcp& tcp) {
+void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
     switch (state_) {
         case State::Listen: {
             if (tcp.getFlags() & (Tcp::Flag::FIN | Tcp::Flag::RST | Tcp::Flag::PSH | Tcp::Flag::ACK |
@@ -13,10 +14,10 @@ void TcpConnection::handlePacket(Ip& ip,Tcp& tcp) {
             }
 
             // Setting up the connection states
-            connectionKey_.remoteIp = tcp.getDestinationIP();
-            connectionKey_.remotePort = tcp.getDestPort();
-            connectionKey_.localIp = tcp.getSourceIP();
-            connectionKey_.localPort = tcp.getSourcePort();
+            connectionKey_.remoteIp = tcp.getSourceIP();
+            connectionKey_.remotePort = tcp.getSourcePort();
+            connectionKey_.localIp = tcp.getDestinationIP();
+            connectionKey_.localPort = tcp.getDestPort();
 
             mySeqNumber_ = Tcp::randomIsn();
             myAckNumber_ = tcp.getSeqNumber();
@@ -25,7 +26,7 @@ void TcpConnection::handlePacket(Ip& ip,Tcp& tcp) {
 
             // Syn-ack
             tcp.swapSourceDestPort();
-            myAckNumber_+=1;
+            myAckNumber_ += 1;
             tcp.setAck(myAckNumber_);
             tcp.setSeq(mySeqNumber_);
             tcp.setFlag(Tcp::Flag::ACK);
@@ -37,6 +38,20 @@ void TcpConnection::handlePacket(Ip& ip,Tcp& tcp) {
             break;
         }
         case State::SynReceived: {
+            // Receiving Acknowledgement
+            if (tcp.getFlags() & (Tcp::Flag::FIN | Tcp::Flag::RST | Tcp::Flag::PSH | Tcp::Flag::SYN |
+                                  Tcp::Flag::URG) || !(tcp.getFlags() & (Tcp::Flag::ACK))) {
+                tcp.reject();
+                break;
+            }
+            if (tcp.getAckNumber() != mySeqNumber_ + 1) {
+                tcp.reject();
+                break;
+            }
+
+            mySeqNumber_ += 1;
+            std::cout << "Connection established with : "<< Net::ip_to_string(connectionKey_.remoteIp) <<"::"<<connectionKey_.remotePort << "\n";
+            state_ = State::Established;
             break;
         }
         case State::Established: {

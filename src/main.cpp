@@ -70,15 +70,15 @@ int main() {
                 continue;
             }
 
-            Ip ipHeader{buffer, tun0Fd};
+            Ip ipPacket{buffer, tun0Fd};
 
-            Net::displayBytes(ipHeader.get_data());
+            Net::displayBytes(ipPacket.get_data());
 
             std::cout << '\n';
-            std::cout << ipHeader << '\n';
+            std::cout << ipPacket << '\n';
 
-            const std::span<uint8_t> innerHeader{buffer + ipHeader.header_len(), buffer + ipHeader.total_length()};
-            switch (static_cast<Net::protocol>(ipHeader.protocol())) {
+            const std::span<uint8_t> innerHeader{buffer + ipPacket.header_len(), buffer + ipPacket.total_length()};
+            switch (static_cast<Net::protocol>(ipPacket.protocol())) {
                 case Net::protocol::ICMP: {
                     Icmp icmp{innerHeader};
                     if (icmp.type() != Icmp::RequestType::echo_request) continue;
@@ -86,13 +86,13 @@ int main() {
                     icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
                     icmp.calculateChecksum();
 
-                    ipHeader.reply();
+                    ipPacket.reply();
 
                     std::cout << "\nPing reply sent\n";
                     break;
                 }
                 case Net::protocol::TCP: {
-                    Tcp tcp{innerHeader, ipHeader.source_addr(), ipHeader.dest_addr()};
+                    Tcp tcp{innerHeader, ipPacket.source_addr(), ipPacket.dest_addr()};
                     ConnectionKey connectionKey{tcp.getConnectionKey()};
 
                     if (!tcpTable.checkExistingConnection(connectionKey)) {
@@ -100,7 +100,7 @@ int main() {
                         tcpTable.addConnection(connectionKey, connection);
                     }
 
-                    tcpTable.getConnection(connectionKey)->handlePacket(ipHeader, tcp);
+                    tcpTable.getConnection(connectionKey)->handlePacket(ipPacket, tcp);
 
                     break;
                 }
