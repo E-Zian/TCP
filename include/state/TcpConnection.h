@@ -6,11 +6,12 @@
 #include "model/ConnectionKey.h"
 #include <vector>
 #include <cstdint>
+#include <optional>
 
 class TcpConnection {
 public:
 
-    enum class State { Listen, SynReceived, Established, Closed };
+    enum class State { Listen, SynReceived, Established, TearingDown ,Closed };
 
     void handlePacket(Ip& ip,Tcp& tcp);
 
@@ -24,15 +25,20 @@ private:
 
     ConnectionKey connectionKey_{};
 
-    uint32_t mySeqNumber_{};
-    uint32_t myAckNumber_{};
+    uint32_t localSeqNumber_{};
+    uint32_t localAckNumber_{};
 
-    uint16_t myWindow_{};
-    uint16_t theirWindow_{};
+    uint16_t localWindow_{};
+    uint16_t remoteWindow_{};
 
     std::vector<uint8_t> receivedBuffer_;
     std::vector<uint8_t> sendBuffer_;
 
+    bool localFin_{true};
+    bool remoteFin_{};
+
+    void formatToSend(Tcp& tcp,std::optional<uint8_t> flags = std::nullopt) const;
+    [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
 };
 
 #endif //TCP_TCPCONNECTION_H

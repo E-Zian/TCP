@@ -4,6 +4,9 @@
 #include <iostream>
 
 void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
+    if (!tcp.validateCheckSum()) {
+        return;
+    }
     switch (state_) {
         case State::Listen: {
             if (tcp.getFlags() & Tcp::Flag::RST) {
@@ -21,26 +24,31 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             connectionKey_.localIp = tcp.getDestinationIP();
             connectionKey_.localPort = tcp.getDestPort();
 
-            mySeqNumber_ = Tcp::randomIsn();
-            myAckNumber_ = tcp.getSeqNumber();
-            myWindow_ = std::numeric_limits<uint16_t>::max();
-            theirWindow_ = tcp.getWindow();
+            localSeqNumber_ = Tcp::randomIsn();
+            localAckNumber_ = tcp.getSeqNumber();
+            localWindow_ = std::numeric_limits<uint16_t>::max();
+            remoteWindow_ = tcp.getWindow();
 
             // Syn-ack
-            tcp.swapSourceDestPort();
-            myAckNumber_ += 1;
-            tcp.setAck(myAckNumber_);
-            tcp.setSeq(mySeqNumber_);
+            localAckNumber_ += 1;
+            formatToSend(tcp);
+
+            tcp.setFlag(Tcp::Flag::SYN);
             tcp.setFlag(Tcp::Flag::ACK);
-            tcp.setWindow(myWindow_);
             tcp.calculateCheckSum();
 
             ip.reply();
+
+            localSeqNumber_ += 1;
+
             state_ = State::SynReceived;
             break;
         }
         case State::SynReceived: {
             // Receiving Acknowledgement
+            if (validateRemoteAck(tcp)) {
+                break;
+            }
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
                 break;
@@ -49,20 +57,54 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
                                   Tcp::Flag::URG) || !(tcp.getFlags() & (Tcp::Flag::ACK))) {
                 break;
             }
-            if (tcp.getAckNumber() != mySeqNumber_ + 1) {
+            if (tcp.getAckNumber() != localSeqNumber_ + 1) {
                 break;
             }
 
-            mySeqNumber_ += 1;
+            localSeqNumber_ += 1;
             std::cout << "Connection established with : "<< Net::ip_to_string(connectionKey_.remoteIp) <<"::"<<connectionKey_.remotePort << "\n";
             state_ = State::Established;
             break;
         }
         case State::Established: {
+            if (validateRemoteAck(tcp)) {
+                break;
+            }
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
                 break;
             }
+
+
+
+
+
+            formatToSend(tcp);
+
+
+            if (tcp.getFlags() & Tcp::Flag::FIN) {
+                // remoteFin_ = true;
+
+                tcp.setFlag(Tcp::Flag::FIN);
+                tcp.setFlag(Tcp::Flag::ACK);
+                localAckNumber_+=1;
+
+                state_ = State::TearingDown;
+                // temp instant send fin when receive fin change in future when have sending data
+
+            }
+            tcp.calculateCheckSum();
+            ip.reply();
+
+
+            break;
+        }
+        case State::TearingDown: {
+            if (validateRemoteAck(tcp)) {
+                break;
+            }
+
+            state_ = State::Closed;
 
             break;
         }
@@ -79,4 +121,21 @@ void TcpConnection::abortConnection(Ip &ip, Tcp &tcp) {
     tcp.abort();
     ip.reply();
     state_ = State::Closed;
+}
+
+void TcpConnection::formatToSend(Tcp &tcp,std::optional<uint8_t> flags) const {
+    tcp.swapSourceDestPort();
+    tcp.resetFlags();
+    if (flags.has_value()) {
+        tcp.setFlagByte(flags.value());
+    }
+    tcp.setAck(localAckNumber_);
+    tcp.setSeq(localSeqNumber_);
+    tcp.setWindow(localWindow_);
+}
+
+bool TcpConnection::validateRemoteAck(const Tcp &tcp) const {
+
+    return tcp.getAckNumber() != localSeqNumber_;
+
 }
