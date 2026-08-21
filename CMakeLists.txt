@@ -21,6 +21,7 @@ set(includes
         include/state/TcpConnection.h
         include/state/TcpConnectionTable.h
         include/model/ConnectionKey.h
+        include/state/FlagByte.h
 
 )
 

@@ -1,0 +1,35 @@
+//
+// Created by LeeEeZian on 20/8/2026.
+//
+
+#ifndef TCP_FLAGBYTE_H
+#define TCP_FLAGBYTE_H
+#include <cstdint>
+#include <type_traits>
+
+template<typename T>
+concept EnumType = std::is_enum_v<T>;
+
+template<typename T>
+class FlagByte {
+public:
+    void setFlag(T flag) {
+        flagByte_ |= static_cast<uint8_t>(flag);
+    }
+
+    void clearFlag(T flag) {
+        flagByte_ &= ~static_cast<uint8_t>(flag);
+    }
+
+    [[nodiscard]] bool hasFlag(T flag) const {
+        return flagByte_ & static_cast<uint8_t>(flag);
+    }
+
+    void reset() { flagByte_ = 0; }
+
+    [[nodiscard]] uint8_t value() const { return flagByte_; }
+private:
+    uint8_t flagByte_{};
+};
+
+#endif //TCP_FLAGBYTE_H

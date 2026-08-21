@@ -57,6 +57,10 @@ public:
         data_[Flags] = data_[Flags] | static_cast<uint8_t>(flag);
     };
 
+    void setFlagByte(const uint8_t flagByte) {
+        data_[Flags] = flagByte;
+    }
+
     [[nodiscard]] uint16_t getSourcePort() const {
         return data_[SourcePort] << 8 | data_[SourcePort + 1];
     };

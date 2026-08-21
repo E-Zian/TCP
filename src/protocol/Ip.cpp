@@ -1,8 +1,6 @@
 #include "protocol/Ip.h"
-
-#include <unistd.h>
-
 #include "Net.h"
+#include <unistd.h>
 
 void Ip::swapSourceDestination() {
     Net::swapBytes(&data_[SourceAddr], &data_[DestAddr],4);
