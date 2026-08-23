@@ -1,0 +1,21 @@
+# Default: let Git detect text files and normalize them to LF in the repo
+* text=auto
+
+# Shell scripts must always be LF on disk, or WSL/Linux can't run them
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# C++ sources — normalize, LF is fine and portable
+*.c    text
+*.h    text
+*.cpp  text
+*.hpp  text
+
+# CMake
+CMakeLists.txt text
+*.cmake        text
+
+# Binary files — never touch line endings
+*.png binary
+*.jpg binary
+*.pcap binary

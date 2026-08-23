@@ -4,8 +4,8 @@
 #include "protocol/Tcp.h"
 #include "protocol/Ip.h"
 #include "model/ConnectionKey.h"
+#include "state/FlagByte.h"
 #include <vector>
-#include <cstdint>
 #include <optional>
 
 class TcpConnection {
@@ -37,7 +37,7 @@ private:
     bool localFin_{true};
     bool remoteFin_{};
 
-    void formatToSend(Tcp& tcp,std::optional<uint8_t> flags = std::nullopt) const;
+    void formatToSend(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
     [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
 };
 

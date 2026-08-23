@@ -27,7 +27,7 @@ public:
 
     void reset() { flagByte_ = 0; }
 
-    [[nodiscard]] uint8_t value() const { return flagByte_; }
+    [[nodiscard]] uint8_t getHexa() const { return flagByte_; }
 private:
     uint8_t flagByte_{};
 };
