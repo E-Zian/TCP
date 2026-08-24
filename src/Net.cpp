@@ -1,5 +1,6 @@
 #include "Net.h"
 #include <iostream>
+#include <arpa/inet.h>
 
 uint16_t net::checksum(const std::span<const uint8_t> data) {
     uint32_t sum{};
@@ -33,6 +34,7 @@ void net::displayBytes(const std::span<const uint8_t> bytes) {
                 << static_cast<int>(bytes[i]) << ' ';
         if ((i + 1) % 16 == 0) std::cout << '\n'; // 16 bytes per row
     }
+    std::cout << std::dec << '\n'<<'\n';
 };
 
 std::string net::ip_to_string(const uint32_t address) {
@@ -42,14 +44,50 @@ std::string net::ip_to_string(const uint32_t address) {
            std::to_string(address & 0xFF);
 }
 
-uint8_t net::bytes::read8(const std::span<const uint8_t> bytes, const size_t offset) {
+uint8_t net::bytes::read8(const std::span<uint8_t> bytes, const size_t offset) {
         return bytes[offset];
 }
 
-uint16_t net::bytes::read16(const std::span<const uint8_t> bytes, const size_t offset) {
-    return bytes[offset] << 8 | bytes[offset + 1];
+uint16_t net::bytes::read16(const std::span<uint8_t> bytes, const size_t offset) {
+    return static_cast<uint16_t>(bytes[offset] << 8 | bytes[offset + 1]);
 }
 
-uint32_t net::bytes::read32(const std::span<const uint8_t> bytes, const size_t offset) {
-    return bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3] ;
+uint32_t net::bytes::read32(const std::span<uint8_t> bytes, const size_t offset) {
+    return static_cast<uint32_t>(bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3] );
+}
+
+std::vector<uint8_t> net::bytes::toBytes16(const uint16_t data) {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(2);
+
+    bytes.push_back(static_cast<uint8_t>(data >> 8));
+    bytes.push_back(static_cast<uint8_t>(data & 0xFF));
+
+    return bytes;
+}
+
+std::vector<uint8_t> net::bytes::toBytes32(const uint32_t data) {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(4);
+
+    bytes.push_back(static_cast<uint8_t>(data >> 24));
+    bytes.push_back(static_cast<uint8_t>(data >> 16));
+    bytes.push_back(static_cast<uint8_t>(data >> 8));
+    bytes.push_back(static_cast<uint8_t>(data & 0xFF));
+
+    return bytes;
+
+};
+
+void net::bytes::appendBytes16(const uint16_t data,std::vector<uint8_t>& byteBuffer) {
+    byteBuffer.push_back(static_cast<uint8_t>(data >> 8));
+    byteBuffer.push_back(static_cast<uint8_t>(data & 0xFF));
+
+}
+
+void net::bytes::appendBytes32(const uint32_t data,std::vector<uint8_t>& byteBuffer) {
+    byteBuffer.push_back(static_cast<uint8_t>(data >> 24));
+    byteBuffer.push_back(static_cast<uint8_t>(data >> 16));
+    byteBuffer.push_back(static_cast<uint8_t>(data >> 8));
+    byteBuffer.push_back(static_cast<uint8_t>(data & 0xFF));
 }

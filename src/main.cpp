@@ -71,11 +71,11 @@ int main() {
             }
 
             Ip ipPacket{buffer, tun0Fd};
-
+            std::cout<<"From Ip : " << '\n';
             net::displayBytes(ipPacket.get_data());
 
-            std::cout << '\n';
-            std::cout << ipPacket << '\n';
+            // std::cout << '\n';
+            // std::cout << ipPacket << '\n';
 
             const std::span<uint8_t> innerHeader{buffer + ipPacket.header_len(), buffer + ipPacket.total_length()};
             switch (static_cast<net::protocol>(ipPacket.protocol())) {

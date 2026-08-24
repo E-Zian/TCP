@@ -2,12 +2,13 @@
 #ifndef TCP_TCP_H
 #define TCP_TCP_H
 
+#include "state/FlagByte.h"
 #include "model/ConnectionKey.h"
 #include <cstdint>
+#include <format>
 #include <span>
 #include <vector>
 
-#include "state/FlagByte.h"
 
 struct TcpPseudoHeader {
     uint32_t sourceIP;
@@ -18,17 +19,17 @@ struct TcpPseudoHeader {
 };
 
 struct TcpConstructConfig {
-    uint32_t sourceIP_;
-    uint32_t destinationIP_;
+    uint32_t sourceIP;
+    uint32_t destinationIP;
 
-    uint16_t sourcePort_;
-    uint16_t destinationPort_;
-    uint32_t seqNum_;
-    uint32_t ackNum_;
-    uint8_t dataOffset_;
-    uint8_t flags_;
-    uint16_t windowSize_;
-    uint16_t urgentPtr_;
+    uint16_t sourcePort;
+    uint16_t destinationPort;
+    uint32_t seqNum;
+    uint32_t ackNum;
+    uint8_t dataOffset;
+    uint8_t flags;
+    uint16_t windowSize;
+    uint16_t urgentPtr;
 };
 
 class Tcp {
@@ -41,7 +42,7 @@ public:
         DataOffset = 12, // first 4 bits , last 4 is reserved
         Flags = 13, // 1 byte of control bits
         Window = 14, // 2 bytes
-        Checksum = 16, // 2 bytes
+        CheckSum = 16, // 2 bytes
         UrgentPtr = 18, // 2 bytes
         // Options / payload start at (DataOffset nibble * 4)
     };
@@ -55,9 +56,21 @@ public:
         URG = 0x20,
     };
 
+    enum Option : uint8_t {
+        EOL = 0,  // End of Option List, 1 byte, no length/value
+        NOP = 1,      // No-Operation 1 byte, no length/value (padding)
+        MSS = 2,   // Maximum Segment Size length 4, SYN only
+        WScale = 3,      // Window Scale length 3, SYN only
+        SackOK = 4,    //SACK Permitted length 2, SYN only
+        Sack = 5,             // variable length, data segments
+        TS = 8,       // Timestamps length 10, SYN + data
+    };
+
     Tcp(std::span<uint8_t> data,uint32_t sourceIP,uint32_t destinationIP);
 
-    Tcp(TcpConstructConfig tcpConstructConfig);
+    explicit Tcp(const TcpConstructConfig &tcpConstructConfig);
+
+    static uint32_t randomIsn();
 
     void swapSourceDestPort();
 
@@ -67,66 +80,33 @@ public:
 
     bool validateCheckSum();
 
-    void resetFlags(){
-        data_[Flags] = 0;
-    };
-
-    void setFlag(const Flag flag){
-        data_[Flags] = data_[Flags] | static_cast<uint8_t>(flag);
-    };
-
-    void setFlagByte(const uint8_t flagByte) {
-        data_[Flags] = flagByte;
-    }
-
     [[nodiscard]] uint16_t getSourcePort() const {
-        return data_[SourcePort] << 8 | data_[SourcePort + 1];
+        return sourcePort_;
     };
 
     [[nodiscard]] uint16_t getDestPort() const {
-        return data_[DestPort] << 8 | data_[DestPort + 1];
+        return destinationPort_;
     }
 
     [[nodiscard]] uint32_t getSeqNumber() const {
-        return static_cast<uint32_t>(data_[SeqNum] << 24) | data_[SeqNum + 1] << 16 | data_[SeqNum + 2] << 8 | data_[SeqNum + 3];
+        return seqNum_;
     };
 
     [[nodiscard]] uint32_t getAckNumber() const {
-        return static_cast<uint32_t>(data_[AckNum] << 24) | data_[AckNum + 1] << 16 | data_[AckNum + 2] << 8 | data_[AckNum + 3];
+        return ackNum_;
     };
 
     [[nodiscard]] uint8_t getDataOffset() const {
-        return (data_[DataOffset] >> 4) * 4;
+        return (dataOffset_ >> 4)*4;
     };
 
     [[nodiscard]] uint8_t getFlags() const {
-        return data_[Flags];
+        return flags_.getHexa();
     };
 
     [[nodiscard]] uint16_t getWindow() const {
-        return data_[Window] << 8 | data_[Window + 1];
+        return windowSize_;
     };
-
-    void setSeq(const uint32_t sequenceNumber) {
-        data_[SeqNum]     = sequenceNumber >> 24;
-        data_[SeqNum + 1] = sequenceNumber >> 16;
-        data_[SeqNum + 2] = sequenceNumber >> 8;
-        data_[SeqNum + 3] = sequenceNumber;
-    }
-
-    void setAck(const uint32_t AcknowledgementNumber) {
-        data_[AckNum]     = AcknowledgementNumber >> 24;
-        data_[AckNum + 1] = AcknowledgementNumber >> 16;
-        data_[AckNum + 2] = AcknowledgementNumber >> 8;
-        data_[AckNum + 3] = AcknowledgementNumber;
-    }
-
-    void setWindow(const uint16_t windowSize) {
-        data_[Window]     = windowSize >> 8;
-        data_[Window + 1] = windowSize;
-    }
-
-    static uint32_t randomIsn();
 
     [[nodiscard]] uint32_t getSourceIP() const {
         return sourceIP_;
@@ -138,9 +118,35 @@ public:
 
     [[nodiscard]] ConnectionKey getConnectionKey() const;
 
+    void setSeq(const uint32_t sequenceNumber) {
+        seqNum_ = sequenceNumber;
+    }
+
+    void setAck(const uint32_t acknowledgementNumber) {
+        ackNum_ = acknowledgementNumber;
+    }
+
+    void setWindow(const uint16_t windowSize) {
+        windowSize_ = windowSize;
+    }
+
+    void resetFlags(){
+        flags_.reset();
+    };
+
+    void setFlag(const Flag flag){
+        flags_.setFlag(flag);
+    };
+
+    void setFlagByte(const uint8_t flagByte) {
+        flags_.setFlagByte(flagByte);
+    }
+
+    [[nodiscard]] std::vector<uint8_t> dump() const;
+
+
 
 private:
-    std::span<uint8_t> data_;
     uint32_t sourceIP_;
     uint32_t destinationIP_;
 
@@ -154,6 +160,8 @@ private:
     uint16_t checkSum_;
     uint16_t urgentPtr_;
 
+    std::vector<uint8_t> options_;
+    std::vector<uint8_t> payload_;
 
 };
 #endif //TCP_TCP_H
