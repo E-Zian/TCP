@@ -7,12 +7,28 @@
 #include <span>
 #include <vector>
 
+#include "state/FlagByte.h"
+
 struct TcpPseudoHeader {
     uint32_t sourceIP;
     uint32_t destinationIP;
     uint8_t zeroPadding;
     uint8_t protocol;
     uint16_t tcpLength;
+};
+
+struct TcpConstructConfig {
+    uint32_t sourceIP_;
+    uint32_t destinationIP_;
+
+    uint16_t sourcePort_;
+    uint16_t destinationPort_;
+    uint32_t seqNum_;
+    uint32_t ackNum_;
+    uint8_t dataOffset_;
+    uint8_t flags_;
+    uint16_t windowSize_;
+    uint16_t urgentPtr_;
 };
 
 class Tcp {
@@ -40,6 +56,8 @@ public:
     };
 
     Tcp(std::span<uint8_t> data,uint32_t sourceIP,uint32_t destinationIP);
+
+    Tcp(TcpConstructConfig tcpConstructConfig);
 
     void swapSourceDestPort();
 
@@ -120,10 +138,22 @@ public:
 
     [[nodiscard]] ConnectionKey getConnectionKey() const;
 
+
 private:
     std::span<uint8_t> data_;
     uint32_t sourceIP_;
     uint32_t destinationIP_;
+
+    uint16_t sourcePort_;
+    uint16_t destinationPort_;
+    uint32_t seqNum_;
+    uint32_t ackNum_;
+    uint8_t dataOffset_;
+    FlagByte<Flag> flags_;
+    uint16_t windowSize_;
+    uint16_t checkSum_;
+    uint16_t urgentPtr_;
+
 
 };
 #endif //TCP_TCP_H

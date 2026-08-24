@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 void Ip::swapSourceDestination() {
-    Net::swapBytes(&data_[SourceAddr], &data_[DestAddr],4);
+    net::swapBytes(&data_[SourceAddr], &data_[DestAddr],4);
 }
 
 void Ip::resetCheckSum() {
@@ -13,7 +13,7 @@ void Ip::resetCheckSum() {
 
 uint16_t Ip::calculateCheckSum() {
     resetCheckSum();
-    const uint16_t checkSum{ Net::checksum(data_.first(header_len())) };
+    const uint16_t checkSum{ net::checksum(data_.first(header_len())) };
     data_[Checksum] = checkSum >> 8;
     data_[Checksum+1] = checkSum & 0xff;
     return checkSum;

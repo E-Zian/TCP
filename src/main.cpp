@@ -43,7 +43,7 @@ int main() {
     try {
         TcpConnectionTable tcpTable{};
 
-        uint8_t buffer[Constants::MAX_TRANSMISSION_UNIT];
+        uint8_t buffer[constants::MAX_TRANSMISSION_UNIT];
 
         const int tun0Fd{tun_alloc("tun0")};
 
@@ -72,14 +72,14 @@ int main() {
 
             Ip ipPacket{buffer, tun0Fd};
 
-            Net::displayBytes(ipPacket.get_data());
+            net::displayBytes(ipPacket.get_data());
 
             std::cout << '\n';
             std::cout << ipPacket << '\n';
 
             const std::span<uint8_t> innerHeader{buffer + ipPacket.header_len(), buffer + ipPacket.total_length()};
-            switch (static_cast<Net::protocol>(ipPacket.protocol())) {
-                case Net::protocol::ICMP: {
+            switch (static_cast<net::protocol>(ipPacket.protocol())) {
+                case net::protocol::ICMP: {
                     Icmp icmp{innerHeader};
                     if (icmp.type() != Icmp::RequestType::echo_request) continue;
 
@@ -91,7 +91,7 @@ int main() {
                     std::cout << "\nPing reply sent\n";
                     break;
                 }
-                case Net::protocol::TCP: {
+                case net::protocol::TCP: {
                     Tcp tcp{innerHeader, ipPacket.source_addr(), ipPacket.dest_addr()};
                     ConnectionKey connectionKey{tcp.getConnectionKey()};
 

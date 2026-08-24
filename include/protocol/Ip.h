@@ -71,8 +71,8 @@ inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
             << "TTL: " << static_cast<int>(h.ttl()) << '\n'
             << "Protocol: " << static_cast<int>(h.protocol()) << '\n'
             << "Checksum: " << h.checksum() << '\n'
-            << "Source Address: " << Net::ip_to_string(h.source_addr()) << '\n'
-            << "Destination Address: " << Net::ip_to_string(h.dest_addr()) << '\n';
+            << "Source Address: " << net::ip_to_string(h.source_addr()) << '\n'
+            << "Destination Address: " << net::ip_to_string(h.dest_addr()) << '\n';
 
     return os;
 }

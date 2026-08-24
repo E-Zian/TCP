@@ -56,7 +56,7 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             }
 
             localSeqNumber_ += 1;
-            std::cout << "Connection established with : " << Net::ip_to_string(connectionKey_.remoteIp) << "::" <<
+            std::cout << "Connection established with : " << net::ip_to_string(connectionKey_.remoteIp) << "::" <<
                     connectionKey_.remotePort << "\n";
             state_ = State::Established;
             break;
@@ -84,7 +84,6 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             formatToSend(tcp, flags);
 
             ip.reply();
-
 
             break;
         }

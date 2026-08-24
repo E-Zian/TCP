@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <bits/ios_base.h>
 
-namespace Net {
+namespace net {
     uint16_t checksum(std::span<const uint8_t> data);
 
     enum class protocol : uint8_t {
@@ -24,7 +24,14 @@ namespace Net {
     std::string ip_to_string(uint32_t address);
 }
 
-namespace Constants {
+namespace net::bytes {
+    uint8_t read8(std::span<const uint8_t> bytes,size_t offset);
+    uint16_t read16(std::span<const uint8_t> bytes,size_t offset);
+    uint32_t read32(std::span<const uint8_t> bytes,size_t offset);
+
+}
+
+namespace constants {
     inline constexpr  size_t MAX_TRANSMISSION_UNIT {1500};
 }
 
