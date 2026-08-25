@@ -73,9 +73,8 @@ Tcp::Tcp(const TcpConstructConfig &tcpConstructConfig) : sourceIP_{tcpConstructC
 
 
 void Tcp::swapSourceDestPort() {
-    const uint32_t temp = sourcePort_;
-    sourcePort_ = destinationPort_;
-    destinationPort_ = temp;
+    std::swap(sourcePort_, destinationPort_);
+
 }
 
 uint16_t Tcp::calculateCheckSum() {
@@ -99,8 +98,6 @@ uint16_t Tcp::calculateCheckSum() {
     checkSumTemp.insert(checkSumTemp.end(), ph, ph + sizeof(pseudoHeader));
 
     std::vector<uint8_t> byteDump{dump()};
-    std::cout << "From tcp Dump: "<<'\n';
-    net::displayBytes(byteDump);
 
     checkSumTemp.insert(checkSumTemp.end(), byteDump.begin(), byteDump.end());
 
