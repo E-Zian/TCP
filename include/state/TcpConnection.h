@@ -13,7 +13,7 @@ public:
 
     enum class State { Listen, SynReceived, Established, TearingDown ,Closed };
 
-    void handlePacket(Ip& ip,Tcp& tcp);
+    std::optional<Tcp> handlePacket(Tcp& tcp);
 
     void abortConnection(Ip &ip, Tcp &tcp);
 
@@ -37,7 +37,7 @@ private:
     bool localFin_{true};
     bool remoteFin_{};
 
-    void formatToSend(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
+    void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
     [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
 };
 

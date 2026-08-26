@@ -31,12 +31,12 @@ std::vector<uint8_t> Tcp::dump() const {
     appendBytes16(getDestPort(), data);
     appendBytes32(getSeqNumber(), data);
     appendBytes32(getAckNumber(), data);
-    data.push_back(getDataOffset());
+    data.push_back(getDataOffsetByte());
     data.push_back(getFlags());
     appendBytes16(getWindow(), data);
     appendBytes16(getCheckSum(), data);
     appendBytes16(getUrgentPtr(), data);
-    data.insert(data.end(), getOptions().begin(), getOptions().end());
+    data.insert(data.end(), options_.begin(), options_.end());
 
     return data;
 }

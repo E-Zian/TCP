@@ -100,6 +100,10 @@ public:
         return (dataOffset_ >> 4) * 4;
     };
 
+    [[nodiscard]] uint8_t getDataOffsetByte() const {
+        return dataOffset_;
+    };
+
     [[nodiscard]] uint8_t getFlags() const {
         return flags_.getHexa();
     };

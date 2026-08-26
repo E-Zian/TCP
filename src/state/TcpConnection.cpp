@@ -3,9 +3,9 @@
 #include <limits>
 #include <iostream>
 
-void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
+std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
     if (!tcp.validateCheckSum()) {
-        return;
+        return std::nullopt;
     }
     FlagByte<Tcp::Flag> flags;
     switch (state_) {
@@ -34,12 +34,11 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             localAckNumber_ += 1;
             flags.setFlag(Tcp::Flag::SYN);
             flags.setFlag(Tcp::Flag::ACK);
-            formatToSend(tcp, flags);
+            reformatInboundPacket(tcp, flags);
 
-            // ip.reply();
 
             state_ = State::SynReceived;
-            break;
+            return tcp;
         }
         case State::SynReceived: {
             // Receiving Acknowledgement
@@ -81,11 +80,10 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
                 state_ = State::TearingDown;
                 // temp instant send fin when receive fin change in future when have sending data
             }
-            formatToSend(tcp, flags);
+            reformatInboundPacket(tcp, flags);
 
-            // ip.reply();
 
-            break;
+            return tcp;
         }
         case State::TearingDown: {
             if (validateRemoteAck(tcp)) {
@@ -103,6 +101,8 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
         default:
             break;
     }
+
+    return std::nullopt;
 }
 
 void TcpConnection::abortConnection(Ip &ip, Tcp &tcp) {
@@ -111,7 +111,7 @@ void TcpConnection::abortConnection(Ip &ip, Tcp &tcp) {
     state_ = State::Closed;
 }
 
-void TcpConnection::formatToSend(Tcp &tcp, const std::optional<FlagByte<Tcp::Flag> > flags) const {
+void TcpConnection::reformatInboundPacket(Tcp &tcp, const std::optional<FlagByte<Tcp::Flag> > flags) const {
     tcp.swapSourceDestPort();
     if (flags.has_value()) {
         tcp.resetFlags();

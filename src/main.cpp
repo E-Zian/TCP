@@ -85,7 +85,18 @@ int main() {
                     }
 
                     TcpConnection &connection{*tcpTable.getConnection(connectionKey)};
-                    connection.handlePacket(ipPacket, tcp);
+
+                    if (auto tcpToSend{connection.handlePacket(tcp)}; tcpToSend.has_value()) {
+                        std::vector<uint8_t> tcpBytes{tcpToSend.value().dump()};
+
+                        ipPacket.swapSourceDestination();
+                        ipPacket.calculateCheckSum();
+                        ipPacket.appendInnerHeader(tcpBytes);
+
+                        std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
+
+                        tunDevice.write(ipPacketBytes);
+                    }
 
                     if (connection.getState() == TcpConnection::State::Closed) {
                         tcpTable.removeConnection(connectionKey);
