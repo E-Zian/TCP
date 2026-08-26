@@ -22,20 +22,21 @@ ConnectionKey Tcp::getConnectionKey() const {
 }
 
 std::vector<uint8_t> Tcp::dump() const {
+    using namespace net::bytes;
     std::vector<uint8_t> data{};
 
     // change in future to reserve the mss value
     data.reserve(1500);
-    net::bytes::appendBytes16(sourcePort_, data);
-    net::bytes::appendBytes16(destinationPort_, data);
-    net::bytes::appendBytes32(seqNum_, data);
-    net::bytes::appendBytes32(ackNum_, data);
-    data.push_back(dataOffset_);
-    data.push_back(flags_.getHexa());
-    net::bytes::appendBytes16(windowSize_, data);
-    net::bytes::appendBytes16(checkSum_, data);
-    net::bytes::appendBytes16(urgentPtr_, data);
-    data.insert(data.end(), options_.begin(), options_.end());
+    appendBytes16(getSourcePort(), data);
+    appendBytes16(getDestPort(), data);
+    appendBytes32(getSeqNumber(), data);
+    appendBytes32(getAckNumber(), data);
+    data.push_back(getDataOffset());
+    data.push_back(getFlags());
+    appendBytes16(getWindow(), data);
+    appendBytes16(getCheckSum(), data);
+    appendBytes16(getUrgentPtr(), data);
+    data.insert(data.end(), getOptions().begin(), getOptions().end());
 
     return data;
 }
@@ -53,7 +54,6 @@ Tcp::Tcp(std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destin
     urgentPtr_{net::bytes::read16(data, UrgentPtr)},
     options_{data.begin() + 20, data.begin() + getDataOffset()},
     payload_(data.begin() + getDataOffset(), data.end()) {
-
 }
 
 Tcp::Tcp(const TcpConstructConfig &tcpConstructConfig) : sourceIP_{tcpConstructConfig.sourceIP},
@@ -74,7 +74,6 @@ Tcp::Tcp(const TcpConstructConfig &tcpConstructConfig) : sourceIP_{tcpConstructC
 
 void Tcp::swapSourceDestPort() {
     std::swap(sourcePort_, destinationPort_);
-
 }
 
 uint16_t Tcp::calculateCheckSum() {

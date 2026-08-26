@@ -1,43 +1,18 @@
 #include "protocol/Ip.h"
 #include "Net.h"
+#include "io/TunDevice.h"
 #include "state/TcpConnectionTable.h"
 #include "protocol/Tcp.h"
 #include "protocol/Icmp.h"
-#include <fcntl.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <net/if.h>
-#include <linux/if_tun.h>
 #include <iostream>
-#include <cstring>
-#include <cerrno>
 #include <arpa/inet.h>
 #include <ostream>
 #include <string>
 #include <system_error>
 #include <span>
 
-namespace {
-    int tun_alloc(const std::string &dev) {
-        const int fd = ::open("/dev/net/tun", O_RDWR);
-        if (fd < 0)
-            throw std::system_error(errno, std::generic_category(),
-                                    "opening /dev/net/tun");
-
-        ifreq ifr{};
-        ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-
-        std::strncpy(ifr.ifr_name, dev.c_str(), IFNAMSIZ - 1);
-
-        if (::ioctl(fd, TUNSETIFF, &ifr) < 0) {
-            ::close(fd);
-            throw std::system_error(errno, std::generic_category(),
-                                    "ioctl(TUNSETIFF) on " + dev);
-        }
-
-        return fd;
-    }
-}
 
 int main() {
     try {
@@ -45,12 +20,12 @@ int main() {
 
         uint8_t buffer[constants::MAX_TRANSMISSION_UNIT];
 
-        const int tun0Fd{tun_alloc("tun0")};
+        TunDevice tunDevice{"tun0"};
 
         std::cout << "now listening for packets ... " << '\n';
 
         while (true) {
-            const ssize_t bytes{::read(tun0Fd, buffer, sizeof(buffer))};
+            const ssize_t bytes{tunDevice.read(buffer)};
 
             if (bytes < 0) {
                 std::perror("read");
@@ -71,22 +46,31 @@ int main() {
             }
 
             Ip ipPacket{buffer};
-            std::cout<<"From Ip : " << '\n';
+            std::cout << "From Ip : " << '\n';
             net::displayBytes(ipPacket.dump());
 
-            // std::cout << '\n';
-            // std::cout << ipPacket << '\n';
-
-            const std::span<uint8_t> innerHeader{buffer + ipPacket.getHeaderLength(), buffer + ipPacket.getTotalLength()};
+            const std::span<uint8_t> innerHeader{
+                buffer + ipPacket.getHeaderLength(), buffer + ipPacket.getTotalLength()
+            };
             switch (static_cast<net::protocol>(ipPacket.getProtocol())) {
                 case net::protocol::ICMP: {
                     Icmp icmp{innerHeader};
-                    if (icmp.type() != Icmp::RequestType::echo_request) continue;
+                    if (icmp.getType() != Icmp::RequestType::echo_request) continue;
 
-                    icmp.data_[Icmp::Offset::Type] = Icmp::RequestType::echo_reply;
+                    icmp.setType(Icmp::RequestType::echo_reply);
                     icmp.calculateChecksum();
 
-                    // ipPacket.reply();
+
+                    std::vector<uint8_t> icmpByteBuffer{icmp.dump()};
+
+                    ipPacket.swapSourceDestination();
+                    ipPacket.calculateCheckSum();
+
+                    ipPacket.appendInnerHeader(icmpByteBuffer);
+
+                    std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
+
+                    tunDevice.write(ipPacketBytes);
 
                     std::cout << "\nPing reply sent\n";
                     break;

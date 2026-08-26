@@ -56,11 +56,19 @@ public:
     [[nodiscard]] uint32_t getDestAddr() const { return destAddr_; }
     [[nodiscard]] std::vector<uint8_t> getOptions() const { return options_; }
 
-    // void reply();
+    void setTotalLength(const uint16_t totalLength) { totalLength_ = totalLength; }
 
     bool validateCheckSum();
 
+    void appendInnerHeader(std::span<uint8_t> data);
+
     std::vector<uint8_t> dump();
+
+    std::vector<uint8_t> dumpAll();
+
+    void swapSourceDestination();
+
+    uint16_t calculateCheckSum();
 
 private:
     uint8_t versionNHl_;
@@ -75,13 +83,11 @@ private:
     uint32_t destAddr_;
 
     std::vector<uint8_t> options_;
-    // const int tunFd_;
+
+    std::vector<uint8_t> innerHeader_;
 
     void resetCheckSum();
 
-    void swapSourceDestination();
-
-    uint16_t calculateCheckSum();
 };
 
 

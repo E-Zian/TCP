@@ -36,7 +36,7 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             flags.setFlag(Tcp::Flag::ACK);
             formatToSend(tcp, flags);
 
-            ip.reply();
+            // ip.reply();
 
             state_ = State::SynReceived;
             break;
@@ -83,7 +83,7 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
             }
             formatToSend(tcp, flags);
 
-            ip.reply();
+            // ip.reply();
 
             break;
         }
@@ -107,7 +107,7 @@ void TcpConnection::handlePacket(Ip &ip, Tcp &tcp) {
 
 void TcpConnection::abortConnection(Ip &ip, Tcp &tcp) {
     tcp.abort();
-    ip.reply();
+    // ip.reply();
     state_ = State::Closed;
 }
 

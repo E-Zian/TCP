@@ -22,6 +22,8 @@ set(includes
         include/state/TcpConnectionTable.h
         include/model/ConnectionKey.h
         include/state/FlagByte.h
+        include/io/TunDevice.h
+        src/io/TunDevice.cpp
 
 )
 

@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 void Ip::swapSourceDestination() {
-    std::swap(sourceAddr_, sourceAddr_);
+    std::swap(sourceAddr_, destAddr_);
 }
 
 void Ip::resetCheckSum() {
@@ -44,35 +44,44 @@ Ip::Ip(const IpConfig &config) : versionNHl_{config.versionNHl},
                                  destAddr_{config.destAddr} {
 };
 
-
-// void Ip::reply() {
-//     swapSourceDestination();
-//     calculateCheckSum();
-//     ::write(tunFd_, data_.data(), data_.size_bytes());
-// }
-
 bool Ip::validateCheckSum() {
     const uint16_t checkSum{getChecksum()};
     const uint16_t calculatedCheckSum{calculateCheckSum()};
     return checkSum == calculatedCheckSum;
 }
 
+void Ip::appendInnerHeader(const std::span<uint8_t> data) {
+    innerHeader_.reserve(data.size());
+    innerHeader_.insert(innerHeader_.end(), data.begin(), data.end());
+
+    setTotalLength(getHeaderLength() + data.size());
+}
+
 std::vector<uint8_t> Ip::dump() {
+    using namespace net::bytes;
+
     std::vector<uint8_t> data;
     data.reserve(getHeaderLength());
 
     data.push_back(getVersionNHl());
     data.push_back(getTos());
-    net::bytes::appendBytes16(getTotalLength(), data);
-    net::bytes::appendBytes16(getId(), data);
-    net::bytes::appendBytes16(getFlagsFragment(), data);
+    appendBytes16(getTotalLength(), data);
+    appendBytes16(getId(), data);
+    appendBytes16(getFlagsFragment(), data);
     data.push_back(getTtl());
     data.push_back(getProtocol());
-    net::bytes::appendBytes16(getChecksum(), data);
-    net::bytes::appendBytes32(getSourceAddr(), data);
-    net::bytes::appendBytes32(getDestAddr(), data);
+    appendBytes16(getChecksum(), data);
+    appendBytes32(getSourceAddr(), data);
+    appendBytes32(getDestAddr(), data);
 
     data.insert(data.end(), options_.begin(), options_.end());
+
+    return data;
+}
+
+std::vector<uint8_t> Ip::dumpAll() {
+    std::vector<uint8_t> data{dump()};
+    data.insert(data.end(), innerHeader_.begin(), innerHeader_.end());
 
     return data;
 }

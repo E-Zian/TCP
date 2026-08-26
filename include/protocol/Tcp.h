@@ -57,16 +57,16 @@ public:
     };
 
     enum Option : uint8_t {
-        EOL = 0,  // End of Option List, 1 byte, no length/value
-        NOP = 1,      // No-Operation 1 byte, no length/value (padding)
-        MSS = 2,   // Maximum Segment Size length 4, SYN only
-        WScale = 3,      // Window Scale length 3, SYN only
-        SackOK = 4,    //SACK Permitted length 2, SYN only
-        Sack = 5,             // variable length, data segments
-        TS = 8,       // Timestamps length 10, SYN + data
+        EOL = 0, // End of Option List, 1 byte, no length/value
+        NOP = 1, // No-Operation 1 byte, no length/value (padding)
+        MSS = 2, // Maximum Segment Size length 4, SYN only
+        WScale = 3, // Window Scale length 3, SYN only
+        SackOK = 4, //SACK Permitted length 2, SYN only
+        Sack = 5, // variable length, data segments
+        TS = 8, // Timestamps length 10, SYN + data
     };
 
-    Tcp(std::span<uint8_t> data,uint32_t sourceIP,uint32_t destinationIP);
+    Tcp(std::span<uint8_t> data, uint32_t sourceIP, uint32_t destinationIP);
 
     explicit Tcp(const TcpConstructConfig &tcpConstructConfig);
 
@@ -97,7 +97,7 @@ public:
     };
 
     [[nodiscard]] uint8_t getDataOffset() const {
-        return (dataOffset_ >> 4)*4;
+        return (dataOffset_ >> 4) * 4;
     };
 
     [[nodiscard]] uint8_t getFlags() const {
@@ -116,6 +116,18 @@ public:
         return destinationIP_;
     };
 
+    [[nodiscard]] uint16_t getCheckSum() const {
+        return checkSum_;
+    }
+
+    [[nodiscard]] uint16_t getUrgentPtr() const {
+        return urgentPtr_;
+    }
+
+    [[nodiscard]] std::vector<uint8_t> getOptions() const {
+        return options_;
+    }
+
     [[nodiscard]] ConnectionKey getConnectionKey() const;
 
     void setSeq(const uint32_t sequenceNumber) {
@@ -130,11 +142,11 @@ public:
         windowSize_ = windowSize;
     }
 
-    void resetFlags(){
+    void resetFlags() {
         flags_.reset();
     };
 
-    void setFlag(const Flag flag){
+    void setFlag(const Flag flag) {
         flags_.setFlag(flag);
     };
 
@@ -143,8 +155,6 @@ public:
     }
 
     [[nodiscard]] std::vector<uint8_t> dump() const;
-
-
 
 private:
     uint32_t sourceIP_;
@@ -162,6 +172,5 @@ private:
 
     std::vector<uint8_t> options_;
     std::vector<uint8_t> payload_;
-
 };
 #endif //TCP_TCP_H
