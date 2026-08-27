@@ -29,6 +29,7 @@ struct TcpConstructConfig {
     uint8_t dataOffset;
     uint8_t flags;
     uint16_t windowSize;
+    uint16_t checkSum;
     uint16_t urgentPtr;
 };
 
@@ -132,6 +133,14 @@ public:
         return options_;
     }
 
+    [[nodiscard]] std::vector<uint8_t> getPayload() const {
+        return payload_;
+    }
+
+    [[nodiscard]] size_t getPayloadSize() const {
+        return payload_.size();
+    }
+
     [[nodiscard]] ConnectionKey getConnectionKey() const;
 
     void setSeq(const uint32_t sequenceNumber) {
@@ -158,7 +167,10 @@ public:
         flags_.setFlagByte(flagByte);
     }
 
+    bool setOptions(std::span<uint8_t> options);
+
     [[nodiscard]] std::vector<uint8_t> dump() const;
+
 
 private:
     uint32_t sourceIP_;

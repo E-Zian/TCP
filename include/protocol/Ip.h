@@ -10,7 +10,7 @@ namespace constants {
     inline constexpr size_t ipHeaderSize { 20 };
 }
 
-struct IpConfig {
+struct IpConstructConfig {
     uint8_t versionNHl;
     uint8_t tos;
     uint16_t totalLength;
@@ -27,7 +27,7 @@ class Ip {
 public:
     explicit Ip(std::span<uint8_t> data);
 
-    explicit Ip(const IpConfig &config);
+    explicit Ip(const IpConstructConfig &config);
 
     enum Offset : std::size_t {
         VersionIhl = 0, // byte 0 : (0-4 bit) version, (4-8 bit) header length
@@ -100,8 +100,8 @@ inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
             << "TTL: " << static_cast<int>(h.getTtl()) << '\n'
             << "Protocol: " << static_cast<int>(h.getProtocol()) << '\n'
             << "Checksum: " << h.getChecksum() << '\n'
-            << "Source Address: " << net::ip_to_string(h.getSourceAddr()) << '\n'
-            << "Destination Address: " << net::ip_to_string(h.getDestAddr()) << '\n';
+            << "Source Address: " << net::ipToString(h.getSourceAddr()) << '\n'
+            << "Destination Address: " << net::ipToString(h.getDestAddr()) << '\n';
 
     return os;
 }

@@ -21,6 +21,19 @@ ConnectionKey Tcp::getConnectionKey() const {
     return connectionKey;
 }
 
+bool Tcp::setOptions(const std::span<uint8_t> options)  {
+    const uint8_t offset {static_cast<uint8_t>((options.size()+20)/4)};
+
+    if (offset & 0xf0) {
+        return false;
+    }
+
+    options_.assign(options.begin(), options.end());
+    dataOffset_ = offset << 4;
+
+    return true;
+}
+
 std::vector<uint8_t> Tcp::dump() const {
     using namespace net::bytes;
     std::vector<uint8_t> data{};
@@ -37,23 +50,25 @@ std::vector<uint8_t> Tcp::dump() const {
     appendBytes16(getCheckSum(), data);
     appendBytes16(getUrgentPtr(), data);
     data.insert(data.end(), options_.begin(), options_.end());
+    data.insert(data.end(), payload_.begin(), payload_.end());
 
     return data;
 }
 
+
 Tcp::Tcp(std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destinationIP) : sourceIP_{sourceIP},
-    destinationIP_{destinationIP},
-    sourcePort_{net::bytes::read16(data, SourcePort)},
-    destinationPort_{net::bytes::read16(data, DestPort)},
-    seqNum_{net::bytes::read32(data, SeqNum)},
-    ackNum_{net::bytes::read32(data, AckNum)},
-    dataOffset_{net::bytes::read8(data, DataOffset)},
-    flags_{data[Flags]},
-    windowSize_{net::bytes::read16(data, Window)},
-    checkSum_{net::bytes::read16(data, CheckSum)},
-    urgentPtr_{net::bytes::read16(data, UrgentPtr)},
-    options_{data.begin() + 20, data.begin() + getDataOffset()},
-    payload_(data.begin() + getDataOffset(), data.end()) {
+                                                                                           destinationIP_{destinationIP},
+                                                                                           sourcePort_{net::bytes::read16(data, SourcePort)},
+                                                                                           destinationPort_{net::bytes::read16(data, DestPort)},
+                                                                                           seqNum_{net::bytes::read32(data, SeqNum)},
+                                                                                           ackNum_{net::bytes::read32(data, AckNum)},
+                                                                                           dataOffset_{net::bytes::read8(data, DataOffset)},
+                                                                                           flags_{data[Flags]},
+                                                                                           windowSize_{net::bytes::read16(data, Window)},
+                                                                                           checkSum_{net::bytes::read16(data, CheckSum)},
+                                                                                           urgentPtr_{net::bytes::read16(data, UrgentPtr)},
+                                                                                           options_{data.begin() + 20, data.begin() + getDataOffset()},
+                                                                                           payload_(data.begin() + getDataOffset(), data.end()) {
 }
 
 Tcp::Tcp(const TcpConstructConfig &tcpConstructConfig) : sourceIP_{tcpConstructConfig.sourceIP},
@@ -108,9 +123,10 @@ uint16_t Tcp::calculateCheckSum() {
 }
 
 void Tcp::abort() {
-    swapSourceDestPort();
     resetFlags();
     setFlag(RST);
+    payload_.clear();
+    options_.clear();
     calculateCheckSum();
 }
 

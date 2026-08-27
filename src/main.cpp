@@ -45,9 +45,11 @@ int main() {
                 continue;
             }
 
+            // net::displayBytes(buffer);
+
             Ip ipPacket{buffer};
-            std::cout << "From Ip : " << '\n';
-            net::displayBytes(ipPacket.dump());
+            // std::cout << "From Ip : " << '\n';
+            // net::displayBytes(ipPacket.dump());
 
             const std::span<uint8_t> innerHeader{
                 buffer + ipPacket.getHeaderLength(), buffer + ipPacket.getTotalLength()
@@ -64,9 +66,9 @@ int main() {
                     std::vector<uint8_t> icmpByteBuffer{icmp.dump()};
 
                     ipPacket.swapSourceDestination();
-                    ipPacket.calculateCheckSum();
-
                     ipPacket.appendInnerHeader(icmpByteBuffer);
+
+                    ipPacket.calculateCheckSum();
 
                     std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
 
@@ -90,8 +92,8 @@ int main() {
                         std::vector<uint8_t> tcpBytes{tcpToSend.value().dump()};
 
                         ipPacket.swapSourceDestination();
-                        ipPacket.calculateCheckSum();
                         ipPacket.appendInnerHeader(tcpBytes);
+                        ipPacket.calculateCheckSum();
 
                         std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
 
@@ -99,6 +101,7 @@ int main() {
                     }
 
                     if (connection.getState() == TcpConnection::State::Closed) {
+                        std::cout << "Connection closed for : "<< net::ipToString(connectionKey.remoteIp) << "::" << connectionKey.remotePort << "\n";
                         tcpTable.removeConnection(connectionKey);
                     }
 

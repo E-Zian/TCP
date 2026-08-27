@@ -15,11 +15,12 @@ public:
 
     std::optional<Tcp> handlePacket(Tcp& tcp);
 
-    void abortConnection(Ip &ip, Tcp &tcp);
 
     [[nodiscard]] State getState() const {
         return state_;
     }
+
+    std::vector<uint8_t> recv();
 private:
     State state_{State::Listen};
 
@@ -38,7 +39,14 @@ private:
     bool remoteFin_{};
 
     void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
+
     [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
+
+    void addToReceivedBuffer(std::span<uint8_t>buffer);
+
+    void abortConnection(Tcp &tcp);
+
+    [[nodiscard]] TcpConstructConfig createTcpBase() const;
 };
 
 #endif //TCP_TCPCONNECTION_H

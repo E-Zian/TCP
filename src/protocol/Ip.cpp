@@ -32,7 +32,7 @@ Ip::Ip(const std::span<uint8_t> data) : versionNHl_{net::bytes::read8(data, Vers
                                                  data.begin() + getHeaderLength()) {
 }
 
-Ip::Ip(const IpConfig &config) : versionNHl_{config.versionNHl},
+Ip::Ip(const IpConstructConfig &config) : versionNHl_{config.versionNHl},
                                  tos_{config.tos},
                                  totalLength_{config.totalLength},
                                  id_{config.id},

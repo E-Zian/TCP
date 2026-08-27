@@ -9,7 +9,7 @@ Icmp::Icmp(const std::span<uint8_t> data) : type_{net::bytes::read8(data, Type)}
 }
 
 
-Icmp::Icmp(const IcmpConfig &config) : type_{config.type}, code_{config.code}, checkSum_{config.checksum},
+Icmp::Icmp(const IcmpConstructConfig &config) : type_{config.type}, code_{config.code}, checkSum_{config.checksum},
                                        identifier_{config.identifier}, sequence_{config.sequence} {
 }
 

@@ -37,7 +37,7 @@ void net::displayBytes(const std::span<const uint8_t> bytes) {
     std::cout << std::dec << '\n'<<'\n';
 };
 
-std::string net::ip_to_string(const uint32_t address) {
+std::string net::ipToString(const uint32_t address) {
     return std::to_string((address >> 24) & 0xFF) + '.' +
            std::to_string((address >> 16) & 0xFF) + '.' +
            std::to_string((address >> 8) & 0xFF) + '.' +
@@ -90,4 +90,12 @@ void net::bytes::appendBytes32(const uint32_t data,std::vector<uint8_t>& byteBuf
     byteBuffer.push_back(static_cast<uint8_t>(data >> 16));
     byteBuffer.push_back(static_cast<uint8_t>(data >> 8));
     byteBuffer.push_back(static_cast<uint8_t>(data & 0xFF));
+}
+
+void net::displayBytesAsText(const std::span<const uint8_t> bytes) {
+
+    for (const unsigned char byte : bytes) {
+        std::cout << std::dec<< byte;
+    }
+    std::cout<<'\n';
 }

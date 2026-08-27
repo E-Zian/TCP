@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-struct IcmpConfig {
+struct IcmpConstructConfig {
     uint8_t type;
     uint8_t code;
     uint16_t checksum;
@@ -18,7 +18,7 @@ class Icmp {
 public:
     explicit Icmp(std::span<uint8_t> data);
 
-    explicit Icmp(const IcmpConfig& config);
+    explicit Icmp(const IcmpConstructConfig& config);
 
     enum Offset : std::size_t {
         Type       = 0,   // 1 byte, 8 = echo request, 0 = echo reply

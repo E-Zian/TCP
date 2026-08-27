@@ -24,7 +24,9 @@ namespace net {
 
     void swapBytes(uint8_t* target1, uint8_t* target2,size_t bytes);
     void displayBytes(std::span<const uint8_t> bytes);
-    std::string ip_to_string(uint32_t address);
+    std::string ipToString(uint32_t address);
+
+    void displayBytesAsText(std::span<const uint8_t> bytes);
 }
 
 namespace net::bytes {
