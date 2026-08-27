@@ -19,8 +19,13 @@ public:
     [[nodiscard]] State getState() const {
         return state_;
     }
-
+    
+    // for application
     std::vector<uint8_t> recv();
+    void send(std::span<uint8_t> buffer);
+
+    [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
+
 private:
     State state_{State::Listen};
 
@@ -35,8 +40,8 @@ private:
     std::vector<uint8_t> receivedBuffer_;
     std::vector<uint8_t> sendBuffer_;
 
-    bool localFin_{true};
-    bool remoteFin_{};
+    // Sequence acknowledged by remote until
+    uint32_t seqAckedUntil_{};
 
     void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
 
@@ -46,7 +51,9 @@ private:
 
     void abortConnection(Tcp &tcp);
 
-    [[nodiscard]] TcpConstructConfig createTcpBase() const;
+    void appendLocalData(Tcp& tcp);
+
+    [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
 };
 
 #endif //TCP_TCPCONNECTION_H

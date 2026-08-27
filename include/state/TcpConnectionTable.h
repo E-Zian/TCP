@@ -16,9 +16,11 @@ class TcpConnectionTable {
 
     bool checkExistingConnection(ConnectionKey connectionKey) const;
 
-    TcpConnection* getConnection(const ConnectionKey& connectionKey);
-
     void removeConnection(const ConnectionKey& connectionKey);
+
+    TcpConnection& getOrCreate(const ConnectionKey& key) {
+        return connectionTable_.try_emplace(key).first->second;
+    }
 
     private:
     std::unordered_map<ConnectionKey, TcpConnection> connectionTable_;

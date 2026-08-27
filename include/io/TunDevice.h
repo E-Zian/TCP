@@ -4,6 +4,11 @@
 
 #ifndef TCP_TUNDEVICE_H
 #define TCP_TUNDEVICE_H
+
+#include "protocol/Icmp.h"
+#include "protocol/Ip.h"
+#include "protocol/Tcp.h"
+
 #include <cstdint>
 #include <string>
 #include <span>
@@ -19,6 +24,10 @@ public:
     [[nodiscard]] ssize_t read(std::span<uint8_t> buffer) const;
 
     void write(std::span<uint8_t> buffer) const;
+
+    void sendPacket(Ip& ip, const Tcp& tcp) const;
+
+    void sendPacket(Ip& ip, const Icmp& icmp) const;
 
 private:
     const int fd_;

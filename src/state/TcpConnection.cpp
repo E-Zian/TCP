@@ -26,7 +26,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             connectionKey_.localIp = tcp.getDestinationIP();
             connectionKey_.localPort = tcp.getDestPort();
 
-            localSeqNumber_ = Tcp::randomIsn();
+            localSeqNumber_ = Tcp::generateIsn();
+            seqAckedUntil_ = localSeqNumber_;
             localAckNumber_ = tcp.getSeqNumber();
             localWindow_ = std::numeric_limits<uint16_t>::max();
             remoteWindow_ = tcp.getWindow();
@@ -72,7 +73,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             bool shouldReply{};
 
             if (tcp.getPayloadSize() > 0) {
-                std::vector<uint8_t> buffer{tcp.getPayload()};
+                std::vector<uint8_t> buffer(tcp.getPayload().begin(), tcp.getPayload().end());
                 addToReceivedBuffer(buffer);
                 std::cout<< "Data received from " << net::ipToString(connectionKey_.remoteIp)  << "::" << connectionKey_.remotePort << "\n";
                 net::displayBytesAsText(buffer);
@@ -94,7 +95,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             }
             if (shouldReply) {
                 flags.setFlag(Tcp::Flag::ACK);
-                Tcp tcpToSend{createTcpBase()};
+                Tcp tcpToSend{createTcpBaseConfig()};
 
                 tcpToSend.setFlagByte(flags.getHexa());
                 tcpToSend.setOptions({});
@@ -128,28 +129,37 @@ std::vector<uint8_t> TcpConnection::recv() {
     return std::exchange(receivedBuffer_, {});
 }
 
+void TcpConnection::send(std::span<uint8_t> buffer) {
+    sendBuffer_.insert(sendBuffer_.end(),buffer.begin(), buffer.end());
+}
+
 void TcpConnection::abortConnection(Tcp &tcp) {
     tcp.abort();
     state_ = State::Closed;
 }
 
-TcpConstructConfig TcpConnection::createTcpBase() const {
-    TcpConstructConfig tcpConstructConfig{};
+void TcpConnection::appendLocalData(Tcp &tcp) {
+    std::vector<uint8_t> buffer{std::exchange(sendBuffer_, {})};
+    tcp.insertPayload(buffer);
+}
 
-    tcpConstructConfig.sourceIP = connectionKey_.localIp;
-    tcpConstructConfig.destinationIP = connectionKey_.remoteIp;
-    tcpConstructConfig.sourcePort = connectionKey_.localPort;
-    tcpConstructConfig.destinationPort = connectionKey_.remotePort;
-    tcpConstructConfig.seqNum = localSeqNumber_;
-    tcpConstructConfig.ackNum = localAckNumber_;
+TcpConstructConfig TcpConnection::createTcpBaseConfig() const {
+    TcpConstructConfig config{};
 
-    tcpConstructConfig.dataOffset = 0;
-    tcpConstructConfig.flags = 0;
-    tcpConstructConfig.windowSize = localWindow_;
-    tcpConstructConfig.checkSum = 0;
-    tcpConstructConfig.urgentPtr = 0;
+    config.sourceIP = connectionKey_.localIp;
+    config.destinationIP = connectionKey_.remoteIp;
+    config.sourcePort = connectionKey_.localPort;
+    config.destinationPort = connectionKey_.remotePort;
+    config.seqNum = localSeqNumber_;
+    config.ackNum = localAckNumber_;
 
-    return tcpConstructConfig;
+    config.dataOffset = 0;
+    config.flags = 0;
+    config.windowSize = localWindow_;
+    config.checkSum = 0;
+    config.urgentPtr = 0;
+
+    return config;
 }
 
 void TcpConnection::reformatInboundPacket(Tcp &tcp, const std::optional<FlagByte<Tcp::Flag> > flags) const {
@@ -174,4 +184,22 @@ bool TcpConnection::validateRemoteAck(const Tcp &tcp) const {
 
 void TcpConnection::addToReceivedBuffer(std::span<uint8_t> buffer) {
     receivedBuffer_.insert(receivedBuffer_.end(), buffer.begin(), buffer.end());
+}
+
+
+IpConstructConfig TcpConnection::createIpBaseConfig() const {
+    IpConstructConfig config{};
+    config.versionNHl = (0x04) << 4 | 0x05;
+    config.tos = 0;
+    config.id = Ip::generateId();
+    config.flagsFragment = Ip::Flags::DF << 13;
+    config.ttl = 64;
+    config.protocol = static_cast<uint8_t>(net::protocol::TCP);
+    config.sourceAddr = connectionKey_.localIp;
+    config.destAddr = connectionKey_.remoteIp;
+
+    config.checkSum = 0;
+    config.totalLength = 0;
+
+    return config;
 }

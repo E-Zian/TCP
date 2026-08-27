@@ -6,7 +6,16 @@
 #include <random>
 #include <iostream>
 
-uint32_t Tcp::randomIsn() {
+namespace {
+    struct TcpPseudoHeader {
+        uint32_t sourceIP;
+        uint32_t destinationIP;
+        uint8_t zeroPadding;
+        uint8_t protocol;
+        uint16_t tcpLength;
+    };
+}
+uint32_t Tcp::generateIsn() {
     static std::mt19937 gen{std::random_device{}()};
     std::uniform_int_distribution<uint32_t> dist;
     return dist(gen);
@@ -135,4 +144,8 @@ bool Tcp::validateCheckSum() {
     const uint16_t calculatedCheckSum{calculateCheckSum()};
 
     return checkSum == calculatedCheckSum;
+}
+
+void Tcp::insertPayload(std::span<uint8_t> payload) {
+    payload_.insert(payload_.begin(), payload.begin(), payload.end());
 }

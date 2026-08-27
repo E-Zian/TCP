@@ -70,7 +70,7 @@ int main() {
 
                     ipPacket.calculateCheckSum();
 
-                    std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
+                    std::vector<uint8_t> ipPacketBytes{ipPacket.dump()};
 
                     tunDevice.write(ipPacketBytes);
 
@@ -81,23 +81,13 @@ int main() {
                     Tcp tcp{innerHeader, ipPacket.getSourceAddr(), ipPacket.getDestAddr()};
                     ConnectionKey connectionKey{tcp.getConnectionKey()};
 
-                    if (!tcpTable.checkExistingConnection(connectionKey)) {
-                        TcpConnection connection{};
-                        tcpTable.addConnection(connectionKey, connection);
-                    }
-
-                    TcpConnection &connection{*tcpTable.getConnection(connectionKey)};
+                    TcpConnection &connection{tcpTable.getOrCreate(connectionKey)};
 
                     if (auto tcpToSend{connection.handlePacket(tcp)}; tcpToSend.has_value()) {
-                        std::vector<uint8_t> tcpBytes{tcpToSend.value().dump()};
 
-                        ipPacket.swapSourceDestination();
-                        ipPacket.appendInnerHeader(tcpBytes);
-                        ipPacket.calculateCheckSum();
+                        Ip ipToSend{connection.createIpBaseConfig()};
 
-                        std::vector<uint8_t> ipPacketBytes{ipPacket.dumpAll()};
-
-                        tunDevice.write(ipPacketBytes);
+                        tunDevice.sendPacket(ipToSend,tcpToSend.value());
                     }
 
                     if (connection.getState() == TcpConnection::State::Closed) {

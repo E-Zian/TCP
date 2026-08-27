@@ -4,11 +4,10 @@
 #include <iosfwd>
 #include <netinet/in.h>
 #include <ostream>
+#include <random>
 #include <span>
 #include <string>
-namespace constants {
-    inline constexpr size_t ipHeaderSize { 20 };
-}
+
 
 struct IpConstructConfig {
     uint8_t versionNHl;
@@ -24,6 +23,7 @@ struct IpConstructConfig {
 };
 
 class Ip {
+    static constexpr size_t IpDefaultHeaderSize{20};
 public:
     explicit Ip(std::span<uint8_t> data);
 
@@ -34,7 +34,8 @@ public:
         Tos = 1, // byte 1
         TotalLength = 2, // bytes 2–3
         Id = 4, // bytes 4–5
-        FlagsFragment = 6, // bytes 6–7
+        FlagsFragment = 6,
+        // bytes 6–7 ,first 3 bit is flags , bit 0 is reserved , fragments are the low 13 bits,where this fragment's payload sits
         Ttl = 8, // byte 8
         Protocol = 9, // byte 9
         Checksum = 10, // bytes 10–11
@@ -42,7 +43,15 @@ public:
         DestAddr = 16, // bytes 16–19
     };
 
-    [[nodiscard]] uint8_t getVersionNHl() const { return versionNHl_ ;}
+    enum Flags : uint8_t {
+        DF = 0x02, // dont fragment
+        MF = 0x04, // More Fragments
+    };
+
+    static uint16_t generateId();
+
+    [[nodiscard]] uint8_t getVersionNHl() const { return versionNHl_; }
+
     [[nodiscard]] uint8_t getVersion() const { return versionNHl_ >> 4; }
     [[nodiscard]] uint8_t getHeaderLength() const { return (versionNHl_ & 0x0F) * 4; }
     [[nodiscard]] uint8_t getTos() const { return tos_; }
@@ -54,7 +63,7 @@ public:
     [[nodiscard]] uint16_t getChecksum() const { return checkSum_; }
     [[nodiscard]] uint32_t getSourceAddr() const { return sourceAddr_; }
     [[nodiscard]] uint32_t getDestAddr() const { return destAddr_; }
-    [[nodiscard]] std::vector<uint8_t> getOptions() const { return options_; }
+    [[nodiscard]] std::span<const uint8_t> getOptions() const { return options_; }
 
     void setTotalLength(const uint16_t totalLength) { totalLength_ = totalLength; }
 
@@ -62,9 +71,9 @@ public:
 
     void appendInnerHeader(std::span<uint8_t> data);
 
-    std::vector<uint8_t> dump();
+    std::vector<uint8_t> dumpHeader();
 
-    std::vector<uint8_t> dumpAll();
+    std::vector<uint8_t> dump();
 
     void swapSourceDestination();
 
@@ -87,23 +96,7 @@ private:
     std::vector<uint8_t> innerHeader_;
 
     void resetCheckSum();
-
 };
-
-
-inline std::ostream &operator<<(std::ostream &os, const Ip &h) {
-    os << std::dec
-            << "Version: " << static_cast<int>(h.getVersion()) << '\n'
-            << "Header Length: " << static_cast<int>(h.getHeaderLength()) << '\n'
-            << "Total Length: " << h.getTotalLength() << '\n'
-            << "ID: " << h.getId() << '\n'
-            << "TTL: " << static_cast<int>(h.getTtl()) << '\n'
-            << "Protocol: " << static_cast<int>(h.getProtocol()) << '\n'
-            << "Checksum: " << h.getChecksum() << '\n'
-            << "Source Address: " << net::ipToString(h.getSourceAddr()) << '\n'
-            << "Destination Address: " << net::ipToString(h.getDestAddr()) << '\n';
-
-    return os;
-}
+std::ostream& operator<<(std::ostream& os, const Ip& h);
 
 #endif

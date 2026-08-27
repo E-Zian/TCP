@@ -46,3 +46,25 @@ ssize_t TunDevice::read(std::span<uint8_t> buffer) const {
 void TunDevice::write(const std::span<uint8_t> buffer) const {
     ::write(fd_, buffer.data(), buffer.size_bytes());
 }
+
+void TunDevice::sendPacket(Ip &ip, const Tcp &tcp) const {
+    std::vector<uint8_t> tcpBytes{tcp.dump()};
+
+    ip.appendInnerHeader(tcpBytes);
+    ip.calculateCheckSum();
+
+    std::vector<uint8_t> ipPacketBytes{ip.dump()};
+
+    write(ipPacketBytes);
+}
+
+void TunDevice::sendPacket(Ip &ip, const Icmp &icmp) const {
+    std::vector<uint8_t> icmpBytes{icmp.dump()};
+
+    ip.appendInnerHeader(icmpBytes);
+    ip.calculateCheckSum();
+
+    std::vector<uint8_t> ipPacketBytes{ip.dump()};
+
+    write(ipPacketBytes);
+}

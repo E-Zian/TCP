@@ -10,13 +10,6 @@
 #include <vector>
 
 
-struct TcpPseudoHeader {
-    uint32_t sourceIP;
-    uint32_t destinationIP;
-    uint8_t zeroPadding;
-    uint8_t protocol;
-    uint16_t tcpLength;
-};
 
 struct TcpConstructConfig {
     uint32_t sourceIP;
@@ -71,7 +64,7 @@ public:
 
     explicit Tcp(const TcpConstructConfig &tcpConstructConfig);
 
-    static uint32_t randomIsn();
+    static uint32_t generateIsn();
 
     void swapSourceDestPort();
 
@@ -80,6 +73,8 @@ public:
     void abort();
 
     bool validateCheckSum();
+
+    void insertPayload(std::span<uint8_t> payload);
 
     [[nodiscard]] uint16_t getSourcePort() const {
         return sourcePort_;
@@ -129,11 +124,11 @@ public:
         return urgentPtr_;
     }
 
-    [[nodiscard]] std::vector<uint8_t> getOptions() const {
+    [[nodiscard]] std::span<const uint8_t> getOptions() const {
         return options_;
     }
 
-    [[nodiscard]] std::vector<uint8_t> getPayload() const {
+    [[nodiscard]] std::span<const uint8_t> getPayload() const {
         return payload_;
     }
 

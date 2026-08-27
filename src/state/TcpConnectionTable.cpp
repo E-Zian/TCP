@@ -12,14 +12,6 @@ bool TcpConnectionTable::checkExistingConnection(const ConnectionKey connectionK
     return connectionTable_.contains(connectionKey);
 }
 
-TcpConnection * TcpConnectionTable::getConnection(const ConnectionKey &connectionKey) {
-    const auto it = connectionTable_.find(connectionKey);
-    if (it == connectionTable_.end()) {
-        return nullptr;
-    }
-    return &(it->second);
-}
-
 void TcpConnectionTable::removeConnection(const ConnectionKey &connectionKey) {
     connectionTable_.erase(connectionKey);
 }
