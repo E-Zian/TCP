@@ -56,6 +56,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 break;
             }
 
+            remoteWindow_ = tcp.getWindow();
+
             localSeqNumber_ += 1;
             std::cout << "Connection established with : " << net::ipToString(connectionKey_.remoteIp) << "::" <<
                     connectionKey_.remotePort << "\n\n";
@@ -63,14 +65,20 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             break;
         }
         case State::Established: {
-            if (validateRemoteAck(tcp)) {
+            if (!validateRemoteAck(tcp)) {
                 break;
             }
+
+            seqAckedUntil_ = localSeqNumber_;
+
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
                 break;
             }
+
             bool shouldReply{};
+
+            remoteWindow_ = tcp.getWindow();
 
             if (tcp.getPayloadSize() > 0) {
                 std::vector<uint8_t> buffer(tcp.getPayload().begin(), tcp.getPayload().end());
@@ -79,6 +87,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 net::displayBytesAsText(buffer);
 
                 localAckNumber_ += buffer.size();
+
+                queueSend(buffer);
 
                 shouldReply = true;
             }
@@ -97,9 +107,18 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 flags.setFlag(Tcp::Flag::ACK);
                 Tcp tcpToSend{createTcpBaseConfig()};
 
-                tcpToSend.setFlagByte(flags.getHexa());
                 tcpToSend.setOptions({});
+
+                if (auto buffer{flushSendBuffer()}; buffer.has_value()) {
+                    tcpToSend.insertPayload(buffer.value());
+                    flags.setFlag(Tcp::Flag::PSH);
+                    std::cout << "Sending data to " << net::ipToString(connectionKey_.remoteIp) << "::" << connectionKey_.remotePort << "\n";
+                }
+
+                tcpToSend.setFlagByte(flags.getHexa());
+
                 tcpToSend.calculateCheckSum();
+
                 return tcpToSend;
             }
 
@@ -129,18 +148,27 @@ std::vector<uint8_t> TcpConnection::recv() {
     return std::exchange(receivedBuffer_, {});
 }
 
-void TcpConnection::send(std::span<uint8_t> buffer) {
+void TcpConnection::queueSend(std::span<uint8_t> buffer) {
     sendBuffer_.insert(sendBuffer_.end(),buffer.begin(), buffer.end());
+}
+
+std::optional<std::vector<uint8_t>> TcpConnection::flushSendBuffer() {
+    if (sendBuffer_.empty()) return std::nullopt;
+
+    const size_t sizeToSend = std::min(sendBuffer_.size(), static_cast<size_t>(remoteWindow_));
+
+    std::vector<uint8_t> buffer(sendBuffer_.begin(),sendBuffer_.begin() + static_cast<long>(sizeToSend));
+
+    sendBuffer_.erase(sendBuffer_.begin(),sendBuffer_.begin() + static_cast<long>(sizeToSend));
+
+    localSeqNumber_ += sizeToSend;
+
+    return buffer;
 }
 
 void TcpConnection::abortConnection(Tcp &tcp) {
     tcp.abort();
     state_ = State::Closed;
-}
-
-void TcpConnection::appendLocalData(Tcp &tcp) {
-    std::vector<uint8_t> buffer{std::exchange(sendBuffer_, {})};
-    tcp.insertPayload(buffer);
 }
 
 TcpConstructConfig TcpConnection::createTcpBaseConfig() const {
@@ -177,7 +205,7 @@ void TcpConnection::reformatInboundPacket(Tcp &tcp, const std::optional<FlagByte
 
 bool TcpConnection::validateRemoteAck(const Tcp &tcp) const {
     const bool hasAckFlag{static_cast<bool>(tcp.getFlags() & Tcp::Flag::ACK)};
-    const bool remoteAckNumberValidity{tcp.getAckNumber() != localSeqNumber_};
+    const bool remoteAckNumberValidity{tcp.getAckNumber() == localSeqNumber_};
 
     return hasAckFlag && remoteAckNumberValidity;
 }

@@ -22,7 +22,10 @@ public:
     
     // for application
     std::vector<uint8_t> recv();
-    void send(std::span<uint8_t> buffer);
+
+    void queueSend(std::span<uint8_t> buffer);
+
+    std::optional<std::vector<uint8_t>> flushSendBuffer();
 
     [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
 
@@ -50,8 +53,6 @@ private:
     void addToReceivedBuffer(std::span<uint8_t>buffer);
 
     void abortConnection(Tcp &tcp);
-
-    void appendLocalData(Tcp& tcp);
 
     [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
 };
