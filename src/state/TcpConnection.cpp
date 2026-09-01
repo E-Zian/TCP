@@ -26,13 +26,14 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             connectionKey_.localIp = tcp.getDestinationIP();
             connectionKey_.localPort = tcp.getDestPort();
 
+            setTcpOptions(tcp.getParsedOptions());
+
             localSeqNumber_ = Tcp::generateIsn();
             seqAckedUntil_ = localSeqNumber_;
             localAckNumber_ = tcp.getSeqNumber();
             localWindow_ = std::numeric_limits<uint16_t>::max();
             remoteWindow_ = tcp.getWindow();
 
-            // Syn-ack
             localAckNumber_ += 1;
             flags.setFlag(Tcp::Flag::SYN);
             flags.setFlag(Tcp::Flag::ACK);
@@ -56,6 +57,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 break;
             }
 
+            setTcpOptions(tcp.getParsedOptions());
+
             remoteWindow_ = tcp.getWindow();
 
             localSeqNumber_ += 1;
@@ -68,6 +71,15 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (!validateRemoteAck(tcp)) {
                 break;
             }
+
+            setTcpOptions(tcp.getParsedOptions());
+
+            tcpOptions_.mss.has_value()? std::cout << "mss : " << static_cast<size_t>(tcpOptions_.mss.value()) << '\n' : std::cout << "mss : none" << '\n';
+            tcpOptions_.windowScale.has_value()? std::cout << "windowScale : " << static_cast<size_t>(tcpOptions_.windowScale.value()) << '\n' : std::cout << "windowScale : none" << '\n' ;
+            tcpOptions_.tsVal.has_value()? std::cout << "tsVal:" << tcpOptions_.tsVal.value() << '\n' : std::cout << "tsVal : none" << '\n';
+            tcpOptions_.tsEcr.has_value()? std::cout << "tsEcr:" << tcpOptions_.tsEcr.value() << '\n' : std::cout << "tsEcr : none" << '\n';
+
+            std::cout << '\n';
 
             seqAckedUntil_ = localSeqNumber_;
 
@@ -98,6 +110,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 flags.setFlag(Tcp::Flag::ACK);
 
                 localAckNumber_ += 1;
+
                 shouldReply = true;
 
                 state_ = State::TearingDown;
@@ -128,6 +141,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (tcp.getAckNumber() != localSeqNumber_ + 1) {
                 break;
             }
+
+            setTcpOptions(tcp.getParsedOptions());
 
             state_ = State::Closed;
 
@@ -188,6 +203,24 @@ TcpConstructConfig TcpConnection::createTcpBaseConfig() const {
     config.urgentPtr = 0;
 
     return config;
+}
+
+void TcpConnection::setTcpOptions(const TcpOptions &tcpOptions) {
+    if (tcpOptions.mss.has_value()) {
+        tcpOptions_.mss = *tcpOptions.mss;
+    }
+
+    if (tcpOptions.windowScale.has_value()) {
+        tcpOptions_.windowScale = *tcpOptions.windowScale;
+    }
+
+    if (tcpOptions.tsVal.has_value()) {
+        tcpOptions_.tsVal = *tcpOptions.tsVal;
+    }
+
+    if (tcpOptions.tsEcr.has_value()) {
+        tcpOptions_.tsEcr = *tcpOptions.tsEcr;
+    }
 }
 
 void TcpConnection::reformatInboundPacket(Tcp &tcp, const std::optional<FlagByte<Tcp::Flag> > flags) const {

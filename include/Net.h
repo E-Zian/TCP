@@ -30,9 +30,10 @@ namespace net {
 }
 
 namespace net::bytes {
-    uint8_t read8(std::span<uint8_t> bytes, size_t offset);
-    uint16_t read16(std::span<uint8_t> bytes, size_t offset);
-    uint32_t read32(std::span<uint8_t> bytes, size_t offset);
+    uint8_t read8(std::span<const uint8_t> bytes, size_t offset = 0);
+    uint16_t read16(std::span<const uint8_t> bytes, size_t offset = 0);
+    uint32_t read32(std::span<const uint8_t> bytes, size_t offset = 0);
+    uint64_t read64(std::span<const uint8_t> bytes, size_t offset = 0);
 
     std::vector<uint8_t> toBytes16(uint16_t data);
     std::vector<uint8_t> toBytes32(uint32_t data);

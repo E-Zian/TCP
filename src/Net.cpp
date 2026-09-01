@@ -44,17 +44,29 @@ std::string net::ipToString(const uint32_t address) {
            std::to_string(address & 0xFF);
 }
 
-uint8_t net::bytes::read8(const std::span<uint8_t> bytes, const size_t offset) {
+uint8_t net::bytes::read8(const std::span<const uint8_t> bytes, const size_t offset) {
         return bytes[offset];
 }
 
-uint16_t net::bytes::read16(const std::span<uint8_t> bytes, const size_t offset) {
+uint16_t net::bytes::read16(const std::span<const uint8_t> bytes, const size_t offset) {
     return static_cast<uint16_t>(bytes[offset] << 8 | bytes[offset + 1]);
 }
 
-uint32_t net::bytes::read32(const std::span<uint8_t> bytes, const size_t offset) {
+uint32_t net::bytes::read32(const std::span<const uint8_t> bytes, const size_t offset) {
     return static_cast<uint32_t>(bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3] );
 }
+
+uint64_t net::bytes::read64(const std::span<const uint8_t> bytes, const size_t offset) {
+    return static_cast<uint64_t>(bytes[offset])     << 56 |
+           static_cast<uint64_t>(bytes[offset + 1]) << 48 |
+           static_cast<uint64_t>(bytes[offset + 2]) << 40 |
+           static_cast<uint64_t>(bytes[offset + 3]) << 32 |
+           static_cast<uint64_t>(bytes[offset + 4]) << 24 |
+           static_cast<uint64_t>(bytes[offset + 5]) << 16 |
+           static_cast<uint64_t>(bytes[offset + 6]) << 8  |
+           static_cast<uint64_t>(bytes[offset + 7]);
+}
+
 
 std::vector<uint8_t> net::bytes::toBytes16(const uint16_t data) {
     std::vector<uint8_t> bytes;

@@ -15,6 +15,7 @@ namespace {
         uint16_t tcpLength;
     };
 }
+
 uint32_t Tcp::generateIsn() {
     static std::mt19937 gen{std::random_device{}()};
     std::uniform_int_distribution<uint32_t> dist;
@@ -30,8 +31,8 @@ ConnectionKey Tcp::getConnectionKey() const {
     return connectionKey;
 }
 
-bool Tcp::setOptions(const std::span<uint8_t> options)  {
-    const uint8_t offset {static_cast<uint8_t>((options.size()+20)/4)};
+bool Tcp::setOptions(const std::span<uint8_t> options) {
+    const uint8_t offset{static_cast<uint8_t>((options.size() + 20) / 4)};
 
     if (offset & 0xf0) {
         return false;
@@ -64,20 +65,82 @@ std::vector<uint8_t> Tcp::dump() const {
     return data;
 }
 
+TcpOptions Tcp::parseOptions(const std::span<uint8_t> options) {
+                using namespace net::bytes;
+
+    TcpOptions tcpOptions{};
+    size_t i{};
+
+    while (i < options.size()) {
+        uint8_t kind{options[i]};
+
+        if (kind == Tcp::Option::EOL) {
+            break;
+        }
+
+        if (kind == Tcp::Option::NOP) {
+            i += 1;
+            continue;
+        }
+        if (i + 1 >= options.size()) break;
+
+        const uint8_t length{options[i + 1]};
+
+        if (length < 2 || length + i> options.size()) break;
+
+        i += 2;
+
+        switch (static_cast<Tcp::Option>(kind)) {
+            case Tcp::Option::MSS: {
+                if (length != 4) break;
+
+                tcpOptions.mss = read16(options,i);
+
+                break;
+            }
+
+            case Tcp::Option::WScale: {
+                if (length != 3) break;
+
+                tcpOptions.windowScale = read8(options,i);
+                break;
+
+            }
+
+            case Tcp::Option::TS: {
+                if (length != 10) break;
+
+                tcpOptions.tsVal = read32(options,i);
+                tcpOptions.tsEcr= read32(options,i+4);
+
+                break;
+
+            }
+            default:
+                break;
+        }
+        i += length-2;
+    }
+    return tcpOptions;
+}
+
 
 Tcp::Tcp(std::span<uint8_t> data, const uint32_t sourceIP, const uint32_t destinationIP) : sourceIP_{sourceIP},
-                                                                                           destinationIP_{destinationIP},
-                                                                                           sourcePort_{net::bytes::read16(data, SourcePort)},
-                                                                                           destinationPort_{net::bytes::read16(data, DestPort)},
-                                                                                           seqNum_{net::bytes::read32(data, SeqNum)},
-                                                                                           ackNum_{net::bytes::read32(data, AckNum)},
-                                                                                           dataOffset_{net::bytes::read8(data, DataOffset)},
-                                                                                           flags_{data[Flags]},
-                                                                                           windowSize_{net::bytes::read16(data, Window)},
-                                                                                           checkSum_{net::bytes::read16(data, CheckSum)},
-                                                                                           urgentPtr_{net::bytes::read16(data, UrgentPtr)},
-                                                                                           options_{data.begin() + 20, data.begin() + getDataOffset()},
-                                                                                           payload_(data.begin() + getDataOffset(), data.end()) {
+    destinationIP_{destinationIP},
+    sourcePort_{net::bytes::read16(data, SourcePort)},
+    destinationPort_{net::bytes::read16(data, DestPort)},
+    seqNum_{net::bytes::read32(data, SeqNum)},
+    ackNum_{net::bytes::read32(data, AckNum)},
+    dataOffset_{net::bytes::read8(data, DataOffset)},
+    flags_{data[Flags]},
+    windowSize_{net::bytes::read16(data, Window)},
+    checkSum_{net::bytes::read16(data, CheckSum)},
+    urgentPtr_{net::bytes::read16(data, UrgentPtr)},
+    options_{data.begin() + 20, data.begin() + getDataOffset()},
+    payload_(data.begin() + getDataOffset(), data.end()),
+    tcpOptions_{parseOptions(options_)}
+{
+
 }
 
 Tcp::Tcp(const TcpConstructConfig &tcpConstructConfig) : sourceIP_{tcpConstructConfig.sourceIP},

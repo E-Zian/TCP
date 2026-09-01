@@ -10,7 +10,6 @@
 #include <vector>
 
 
-
 struct TcpConstructConfig {
     uint32_t sourceIP;
     uint32_t destinationIP;
@@ -24,6 +23,13 @@ struct TcpConstructConfig {
     uint16_t windowSize;
     uint16_t checkSum;
     uint16_t urgentPtr;
+};
+
+struct TcpOptions {
+    std::optional<uint16_t> mss;
+    std::optional<uint8_t> windowScale;
+    std::optional<uint32_t> tsVal; // Timestamp Value
+    std::optional<uint32_t> tsEcr ; // Timestamp Echo Reply , last heard
 };
 
 class Tcp {
@@ -128,6 +134,10 @@ public:
         return options_;
     }
 
+    [[nodiscard]] TcpOptions getParsedOptions() const {
+        return tcpOptions_;
+    };
+
     [[nodiscard]] std::span<const uint8_t> getPayload() const {
         return payload_;
     }
@@ -166,6 +176,7 @@ public:
 
     [[nodiscard]] std::vector<uint8_t> dump() const;
 
+    static TcpOptions parseOptions(std::span<uint8_t> options);
 
 private:
     uint32_t sourceIP_;
@@ -183,5 +194,7 @@ private:
 
     std::vector<uint8_t> options_;
     std::vector<uint8_t> payload_;
+
+    TcpOptions tcpOptions_;
 };
 #endif //TCP_TCP_H

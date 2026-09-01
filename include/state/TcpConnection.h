@@ -15,7 +15,6 @@ public:
 
     std::optional<Tcp> handlePacket(Tcp& tcp);
 
-
     [[nodiscard]] State getState() const {
         return state_;
     }
@@ -46,6 +45,8 @@ private:
     // Sequence acknowledged by remote until
     uint32_t seqAckedUntil_{};
 
+    TcpOptions tcpOptions_{};
+
     void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
 
     [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
@@ -55,6 +56,8 @@ private:
     void abortConnection(Tcp &tcp);
 
     [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
+
+    void setTcpOptions(const TcpOptions& tcpOptions);
 };
 
 #endif //TCP_TCPCONNECTION_H
