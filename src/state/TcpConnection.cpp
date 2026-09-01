@@ -57,7 +57,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 break;
             }
 
-            setTcpOptions(tcp.getParsedOptions());
+            updateTimeStamps(tcp.getParsedOptions());
 
             remoteWindow_ = tcp.getWindow();
 
@@ -74,10 +74,18 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
 
             setTcpOptions(tcp.getParsedOptions());
 
-            tcpOptions_.mss.has_value()? std::cout << "mss : " << static_cast<size_t>(tcpOptions_.mss.value()) << '\n' : std::cout << "mss : none" << '\n';
-            tcpOptions_.windowScale.has_value()? std::cout << "windowScale : " << static_cast<size_t>(tcpOptions_.windowScale.value()) << '\n' : std::cout << "windowScale : none" << '\n' ;
-            tcpOptions_.tsVal.has_value()? std::cout << "tsVal:" << tcpOptions_.tsVal.value() << '\n' : std::cout << "tsVal : none" << '\n';
-            tcpOptions_.tsEcr.has_value()? std::cout << "tsEcr:" << tcpOptions_.tsEcr.value() << '\n' : std::cout << "tsEcr : none" << '\n';
+            tcpOptions_.mss.has_value()
+                ? std::cout << "mss : " << static_cast<size_t>(tcpOptions_.mss.value()) << '\n'
+                : std::cout << "mss : none" << '\n';
+            tcpOptions_.windowScale.has_value()
+                ? std::cout << "windowScale : " << static_cast<size_t>(tcpOptions_.windowScale.value()) << '\n'
+                : std::cout << "windowScale : none" << '\n';
+            tcpOptions_.tsVal.has_value()
+                ? std::cout << "tsVal:" << tcpOptions_.tsVal.value() << '\n'
+                : std::cout << "tsVal : none" << '\n';
+            tcpOptions_.tsEcr.has_value()
+                ? std::cout << "tsEcr:" << tcpOptions_.tsEcr.value() << '\n'
+                : std::cout << "tsEcr : none" << '\n';
 
             std::cout << '\n';
 
@@ -95,7 +103,8 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (tcp.getPayloadSize() > 0) {
                 std::vector<uint8_t> buffer(tcp.getPayload().begin(), tcp.getPayload().end());
                 addToReceivedBuffer(buffer);
-                std::cout<< "Data received from " << net::ipToString(connectionKey_.remoteIp)  << "::" << connectionKey_.remotePort << "\n";
+                std::cout << "Data received from " << net::ipToString(connectionKey_.remoteIp) << "::" << connectionKey_
+                        .remotePort << "\n";
                 net::displayBytesAsText(buffer);
 
                 localAckNumber_ += buffer.size();
@@ -120,12 +129,13 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 flags.setFlag(Tcp::Flag::ACK);
                 Tcp tcpToSend{createTcpBaseConfig()};
 
-                tcpToSend.setOptions({});
+                updateTimeStamps(tcp.getParsedOptions());
 
                 if (auto buffer{flushSendBuffer()}; buffer.has_value()) {
                     tcpToSend.insertPayload(buffer.value());
                     flags.setFlag(Tcp::Flag::PSH);
-                    std::cout << "Sending data to " << net::ipToString(connectionKey_.remoteIp) << "::" << connectionKey_.remotePort << "\n";
+                    std::cout << "Sending data to " << net::ipToString(connectionKey_.remoteIp) << "::" <<
+                            connectionKey_.remotePort << "\n";
                 }
 
                 tcpToSend.setFlagByte(flags.getHexa());
@@ -141,8 +151,6 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (tcp.getAckNumber() != localSeqNumber_ + 1) {
                 break;
             }
-
-            setTcpOptions(tcp.getParsedOptions());
 
             state_ = State::Closed;
 
@@ -164,13 +172,17 @@ std::vector<uint8_t> TcpConnection::recv() {
 }
 
 void TcpConnection::queueSend(std::span<uint8_t> buffer) {
-    sendBuffer_.insert(sendBuffer_.end(),buffer.begin(), buffer.end());
+    sendBuffer_.insert(sendBuffer_.end(), buffer.begin(), buffer.end());
 }
 
-std::optional<std::vector<uint8_t>> TcpConnection::flushSendBuffer() {
+std::optional<std::vector<uint8_t> > TcpConnection::flushSendBuffer() {
     if (sendBuffer_.empty()) return std::nullopt;
 
-    const size_t sizeToSend = std::min(sendBuffer_.size(), static_cast<size_t>(remoteWindow_));
+    const uint8_t scale = tcpOptions_.windowScale.value_or(0);
+    const size_t scaledWindow = static_cast<size_t>(remoteWindow_) << scale;
+    const size_t mss = tcpOptions_.mss.value_or(536);
+
+    const size_t sizeToSend = std::min({sendBuffer_.size(), scaledWindow, mss});
 
     std::vector<uint8_t> buffer(sendBuffer_.begin(),sendBuffer_.begin() + static_cast<long>(sizeToSend));
 
@@ -214,6 +226,16 @@ void TcpConnection::setTcpOptions(const TcpOptions &tcpOptions) {
         tcpOptions_.windowScale = *tcpOptions.windowScale;
     }
 
+    if (tcpOptions.tsVal.has_value()) {
+        tcpOptions_.tsVal = *tcpOptions.tsVal;
+    }
+
+    if (tcpOptions.tsEcr.has_value()) {
+        tcpOptions_.tsEcr = *tcpOptions.tsEcr;
+    }
+}
+
+void TcpConnection::updateTimeStamps(const TcpOptions &tcpOptions) {
     if (tcpOptions.tsVal.has_value()) {
         tcpOptions_.tsVal = *tcpOptions.tsVal;
     }

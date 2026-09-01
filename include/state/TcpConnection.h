@@ -58,6 +58,8 @@ private:
     [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
 
     void setTcpOptions(const TcpOptions& tcpOptions);
+
+    void updateTimeStamps(const TcpOptions& tcpOptions);
 };
 
 #endif //TCP_TCPCONNECTION_H
