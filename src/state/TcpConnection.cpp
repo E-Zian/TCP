@@ -167,6 +167,44 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
     return std::nullopt;
 }
 
+std::optional<Tcp> TcpConnection::buildNextSegment() {
+    FlagByte<Tcp::Flag> flags;
+
+    if (synAckPending_) {
+        synAckPending_ = false;
+        flags.setFlag(Tcp::Flag::SYN);
+        flags.setFlag(Tcp::Flag::ACK);
+
+        return makeSegment(flags);
+    }
+
+    flags.setFlag(Tcp::Flag::ACK);
+
+
+    if (finPending_) {
+        finPending_ = false;
+        flags.setFlag(Tcp::Flag::FIN);
+    }
+
+    if (ackOwed_) {
+        ackOwed_ = false;
+    }
+
+    return std::nullopt;
+}
+
+Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const std::span<uint8_t> payload) const {
+    Tcp tcp(createTcpBaseConfig());
+    tcp.setOptions({});
+    tcp.setFlagByte(flags.getHexa());
+
+    if (!payload.empty()) tcp.insertPayload(payload);
+
+    tcp.calculateCheckSum();
+    return tcp;
+}
+
+
 void TcpConnection::queueSend(std::span<uint8_t> buffer) {
     sendBuffer_.insert(sendBuffer_.end(), buffer.begin(), buffer.end());
 }
@@ -206,12 +244,12 @@ TcpConstructConfig TcpConnection::createTcpBaseConfig() const {
     config.destinationPort = connectionKey_.remotePort;
     config.seqNum = localSeqNumber_;
     config.ackNum = localAckNumber_;
+    config.windowSize = localWindow_;
+    config.urgentPtr = 0;
 
     config.dataOffset = 0;
     config.flags = 0;
-    config.windowSize = localWindow_;
     config.checkSum = 0;
-    config.urgentPtr = 0;
 
     return config;
 }
@@ -257,6 +295,7 @@ void TcpConnection::processAck(const Tcp &tcp) {
 
     sendBuffer_.erase(sendBuffer_.begin(), sendBuffer_.begin() + static_cast<long>(acked));
 }
+
 
 void TcpConnection::reformatInboundPacket(Tcp &tcp, const std::optional<FlagByte<Tcp::Flag> > flags) const {
     tcp.swapSourceDestPort();

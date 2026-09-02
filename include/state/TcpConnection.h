@@ -21,7 +21,7 @@ public:
 
     void queueSend(std::span<uint8_t> buffer);
 
-    std::optional<std::vector<uint8_t>> sendNext();
+    std::optional<Tcp> buildNextSegment();
 
     [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
 
@@ -44,6 +44,12 @@ private:
 
     TcpOptions tcpOptions_{};
 
+    bool synAckPending_{};
+
+    bool ackOwed_{};
+
+    bool finPending_{};
+
     void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
 
     [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
@@ -52,13 +58,18 @@ private:
 
     void abortConnection(Tcp &tcp);
 
-    [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
-
     void setTcpOptions(const TcpOptions& tcpOptions);
 
     void updateTimeStamps(const TcpOptions& tcpOptions);
 
     void processAck(const Tcp& tcp);
+
+    [[nodiscard]] Tcp makeSegment(FlagByte<Tcp::Flag> flags, std::span< uint8_t> payload = {}) const;
+
+    [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
+
+    std::optional<std::vector<uint8_t>> sendNext();
+
 };
 
 #endif //TCP_TCPCONNECTION_H
