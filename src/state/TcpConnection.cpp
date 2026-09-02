@@ -172,17 +172,19 @@ void TcpConnection::queueSend(std::span<uint8_t> buffer) {
 }
 
 std::optional<std::vector<uint8_t> > TcpConnection::sendNext() {
-    if (sendBuffer_.empty()) return std::nullopt;
+    const size_t bufferBegin{localSeqNumber_ - sndUna_};
+
+    if (bufferBegin >= sendBuffer_.size()) return std::nullopt;
 
     const uint8_t scale = tcpOptions_.windowScale.value_or(0);
     const size_t scaledWindow = static_cast<size_t>(remoteWindow_) << scale;
     const size_t mss = tcpOptions_.mss.value_or(536);
 
-    const size_t sizeToSend = std::min({sendBuffer_.size(), scaledWindow, mss});
 
-    const size_t bufferBegin{localSeqNumber_ - sndUna_};
+    const size_t sizeToSend = std::min({sendBuffer_.size() - bufferBegin, scaledWindow, mss});
+
     std::vector<uint8_t> buffer(sendBuffer_.begin() + static_cast<long>(bufferBegin),
-                                sendBuffer_.begin() + static_cast<long>(sizeToSend)+ static_cast<long>(bufferBegin));
+                                sendBuffer_.begin() + static_cast<long>(sizeToSend) + static_cast<long>(bufferBegin));
 
 
     localSeqNumber_ += sizeToSend;
