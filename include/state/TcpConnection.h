@@ -18,13 +18,10 @@ public:
     [[nodiscard]] State getState() const {
         return state_;
     }
-    
-    // for application
-    std::vector<uint8_t> recv();
 
     void queueSend(std::span<uint8_t> buffer);
 
-    std::optional<std::vector<uint8_t>> flushSendBuffer();
+    std::optional<std::vector<uint8_t>> sendNext();
 
     [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
 
@@ -42,8 +39,8 @@ private:
     std::vector<uint8_t> receivedBuffer_;
     std::vector<uint8_t> sendBuffer_;
 
-    // Sequence acknowledged by remote until
-    uint32_t seqAckedUntil_{};
+    // Unacknowledged bytes sent pos
+    uint32_t sndUna_{};
 
     TcpOptions tcpOptions_{};
 
@@ -60,6 +57,8 @@ private:
     void setTcpOptions(const TcpOptions& tcpOptions);
 
     void updateTimeStamps(const TcpOptions& tcpOptions);
+
+    void processAck(const Tcp& tcp);
 };
 
 #endif //TCP_TCPCONNECTION_H
