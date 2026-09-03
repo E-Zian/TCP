@@ -8,7 +8,6 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
     if (!tcp.validateCheckSum()) {
         return std::nullopt;
     }
-    FlagByte<Tcp::Flag> flags;
     switch (state_) {
         case State::Listen: {
             if (tcp.getFlags() & Tcp::Flag::RST) {
@@ -34,14 +33,18 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             localWindow_ = std::numeric_limits<uint16_t>::max();
             remoteWindow_ = tcp.getWindow();
 
-            localAckNumber_ += 1;
-            flags.setFlag(Tcp::Flag::SYN);
-            flags.setFlag(Tcp::Flag::ACK);
-            reformatInboundPacket(tcp, flags);
+            synAckPending_ = true;
 
+            localAckNumber_ += 1;
 
             state_ = State::SynReceived;
-            return tcp;
+
+            if (auto segment{buildNextSegment()}) {
+                return {segment.value()};
+            }
+
+
+            return std::nullopt;
         }
         case State::SynReceived: {
             // Receiving Acknowledgement
@@ -56,8 +59,10 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (tcp.getAckNumber() != localSeqNumber_ + 1) {
                 break;
             }
+
             localSeqNumber_ += 1;
             sndUna_ += 1;
+
             updateTimeStamps(tcp.getParsedOptions());
 
             remoteWindow_ = tcp.getWindow();
@@ -71,33 +76,18 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (!validateRemoteAck(tcp))break;
             processAck(tcp);
 
-            setTcpOptions(tcp.getParsedOptions());
+            updateTimeStamps(tcp.getParsedOptions());
 
-            tcpOptions_.mss.has_value()
-                ? std::cout << "mss : " << static_cast<size_t>(tcpOptions_.mss.value()) << '\n'
-                : std::cout << "mss : none" << '\n';
-            tcpOptions_.windowScale.has_value()
-                ? std::cout << "windowScale : " << static_cast<size_t>(tcpOptions_.windowScale.value()) << '\n'
-                : std::cout << "windowScale : none" << '\n';
-            tcpOptions_.tsVal.has_value()
-                ? std::cout << "tsVal:" << tcpOptions_.tsVal.value() << '\n'
-                : std::cout << "tsVal : none" << '\n';
-            tcpOptions_.tsEcr.has_value()
-                ? std::cout << "tsEcr:" << tcpOptions_.tsEcr.value() << '\n'
-                : std::cout << "tsEcr : none" << '\n';
-
-            std::cout << '\n';
 
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
                 break;
             }
 
-            bool shouldReply{};
-
             remoteWindow_ = tcp.getWindow();
 
             if (tcp.getPayloadSize() > 0) {
+                ackOwed_ = true;
                 std::vector<uint8_t> buffer(tcp.getPayload().begin(), tcp.getPayload().end());
                 addToReceivedBuffer(buffer);
                 std::cout << "Data received from " << net::ipToString(connectionKey_.remoteIp) << "::" << connectionKey_
@@ -105,43 +95,18 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 net::displayBytesAsText(buffer);
 
                 localAckNumber_ += buffer.size();
-
-                queueSend(buffer);
-
-                shouldReply = true;
             }
 
             if (tcp.getFlags() & Tcp::Flag::FIN) {
-                flags.setFlag(Tcp::Flag::FIN);
-                flags.setFlag(Tcp::Flag::ACK);
+                finPending_ = true;
 
                 localAckNumber_ += 1;
-
-                shouldReply = true;
 
                 state_ = State::TearingDown;
                 // temp instant send fin when receive fin , change in future when have sending data
             }
-            if (shouldReply) {
-                flags.setFlag(Tcp::Flag::ACK);
-                Tcp tcpToSend{createTcpBaseConfig()};
 
-                updateTimeStamps(tcp.getParsedOptions());
-
-                if (auto buffer{sendNext()}; buffer.has_value()) {
-                    tcpToSend.insertPayload(buffer.value());
-                    tcpToSend.setOptions({});
-                    flags.setFlag(Tcp::Flag::PSH);
-                    std::cout << "Sending data to " << net::ipToString(connectionKey_.remoteIp) << "::" <<
-                            connectionKey_.remotePort << "\n";
-                }
-
-                tcpToSend.setFlagByte(flags.getHexa());
-
-                tcpToSend.calculateCheckSum();
-
-                return tcpToSend;
-            }
+            return buildNextSegment();
 
             break;
         }
@@ -180,14 +145,24 @@ std::optional<Tcp> TcpConnection::buildNextSegment() {
 
     flags.setFlag(Tcp::Flag::ACK);
 
+    if (auto payload{sendNext()}) {
+        flags.setFlag(Tcp::Flag::PSH);
+        ackOwed_ = false;
+
+        return makeSegment(flags, payload.value());
+    }
 
     if (finPending_) {
-        finPending_ = false;
         flags.setFlag(Tcp::Flag::FIN);
+        ackOwed_ = false;
+        finPending_ = false;
+        return makeSegment(flags);
     }
 
     if (ackOwed_) {
         ackOwed_ = false;
+
+        return makeSegment(flags);
     }
 
     return std::nullopt;
@@ -228,6 +203,23 @@ std::optional<std::vector<uint8_t> > TcpConnection::sendNext() {
     localSeqNumber_ += sizeToSend;
 
     return buffer;
+}
+
+void TcpConnection::printConnectionOptions() const {
+    tcpOptions_.mss.has_value()
+        ? std::cout << "mss : " << static_cast<size_t>(tcpOptions_.mss.value()) << '\n'
+        : std::cout << "mss : none" << '\n';
+    tcpOptions_.windowScale.has_value()
+        ? std::cout << "windowScale : " << static_cast<size_t>(tcpOptions_.windowScale.value()) << '\n'
+        : std::cout << "windowScale : none" << '\n';
+    tcpOptions_.tsVal.has_value()
+        ? std::cout << "tsVal:" << tcpOptions_.tsVal.value() << '\n'
+        : std::cout << "tsVal : none" << '\n';
+    tcpOptions_.tsEcr.has_value()
+        ? std::cout << "tsEcr:" << tcpOptions_.tsEcr.value() << '\n'
+        : std::cout << "tsEcr : none" << '\n';
+
+    std::cout << '\n';
 }
 
 void TcpConnection::abortConnection(Tcp &tcp) {
@@ -340,4 +332,7 @@ IpConstructConfig TcpConnection::createIpBaseConfig() const {
     config.totalLength = 0;
 
     return config;
+}
+
+std::optional<Tcp> TcpConnection::checkRetransmission() {
 }

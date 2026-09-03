@@ -25,6 +25,8 @@ public:
 
     [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
 
+    std::optional<Tcp> checkRetransmission();
+
 private:
     State state_{State::Listen};
 
@@ -69,6 +71,8 @@ private:
     [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
 
     std::optional<std::vector<uint8_t>> sendNext();
+
+    void printConnectionOptions() const;
 
 };
 
