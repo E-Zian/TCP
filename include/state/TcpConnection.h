@@ -7,13 +7,22 @@
 #include "state/FlagByte.h"
 #include <vector>
 #include <optional>
+#include <chrono>
+
+namespace constants::RTT {
+    inline constexpr double alpha{0.125};
+    inline constexpr double beta{0.25};
+    inline constexpr uint32_t k{4};
+
+    inline constexpr double rtoMin{1000};
+    inline constexpr double rtoMax{6000};
+}
 
 class TcpConnection {
 public:
+    enum class State { Listen, SynReceived, Established, TearingDown, Closed };
 
-    enum class State { Listen, SynReceived, Established, TearingDown ,Closed };
-
-    std::optional<Tcp> handlePacket(Tcp& tcp);
+    std::optional<Tcp> handlePacket(Tcp &tcp);
 
     [[nodiscard]] State getState() const {
         return state_;
@@ -52,28 +61,53 @@ private:
 
     bool finPending_{};
 
-    void reformatInboundPacket(Tcp& tcp,std::optional<FlagByte<Tcp::Flag>> flags = std::nullopt) const;
+    std::chrono::time_point<std::chrono::steady_clock> lastSentTime_{std::chrono::steady_clock::now()};
 
-    [[nodiscard]] bool validateRemoteAck(const Tcp& tcp) const;
+    uint32_t rto_{};
 
-    void addToReceivedBuffer(std::span<uint8_t>buffer);
+    double srtt_{};
+
+    double rttvar_{};
+
+    bool firstRttSample_{true};
+
+    void reformatInboundPacket(Tcp &tcp, std::optional<FlagByte<Tcp::Flag> > flags = std::nullopt) const;
+
+    [[nodiscard]] bool validateRemoteAck(const Tcp &tcp) const;
+
+    void addToReceivedBuffer(std::span<uint8_t> buffer);
 
     void abortConnection(Tcp &tcp);
 
-    void setTcpOptions(const TcpOptions& tcpOptions);
+    void setTcpOptions(const TcpOptions &tcpOptions);
 
-    void updateTimeStamps(const TcpOptions& tcpOptions);
+    void updateTimeStamps(const TcpOptions &tcpOptions);
 
-    void processAck(const Tcp& tcp);
+    void processAck(const Tcp &tcp);
 
-    [[nodiscard]] Tcp makeSegment(FlagByte<Tcp::Flag> flags, std::span< uint8_t> payload = {}) const;
+    [[nodiscard]] Tcp makeSegment(FlagByte<Tcp::Flag> flags, std::span<uint8_t> payload = {});
 
     [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
 
-    std::optional<std::vector<uint8_t>> sendNext();
+    std::optional<std::vector<uint8_t> > sendNext();
 
     void printConnectionOptions() const;
 
+    [[nodiscard]] uint32_t getSendElapsedTime() const;
+
+    void recalculateRto(uint32_t rtt);
+
+    [[nodiscard]] uint32_t getTsVal() const;
+
+    [[nodiscard]] uint32_t getTsEcr() const;
+
+    void setTsVal(uint32_t ts);
+
+    void setTsEcr(uint32_t ts);
+
+    [[nodiscard]] std::vector<uint8_t> dumpTimeStampsOption() const;
+
+    static uint32_t getCurrentTimeStamp();
 };
 
 #endif //TCP_TCPCONNECTION_H

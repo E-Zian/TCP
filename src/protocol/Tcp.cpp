@@ -32,13 +32,17 @@ ConnectionKey Tcp::getConnectionKey() const {
 }
 
 bool Tcp::setOptions(const std::span<uint8_t> options) {
-    const uint8_t offset{static_cast<uint8_t>((options.size() + 20) / 4)};
+    std::vector<uint8_t> data{options.begin(), options.end()};
+    while (data.size() % 4 != 0) {
+        data.push_back(Tcp::Option::NOP);
+    }
+    const uint8_t offset{static_cast<uint8_t>((data.size() + 20) / 4)};
 
     if (offset & 0xf0) {
         return false;
     }
 
-    options_.assign(options.begin(), options.end());
+    options_ = std::move(data);
     dataOffset_ = offset << 4;
 
     return true;

@@ -2,7 +2,7 @@
 #include "state/FlagByte.h"
 #include <limits>
 #include <iostream>
-#include <utility>
+#include <cmath>
 
 std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
     if (!tcp.validateCheckSum()) {
@@ -25,7 +25,9 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             connectionKey_.localIp = tcp.getDestinationIP();
             connectionKey_.localPort = tcp.getDestPort();
 
-            setTcpOptions(tcp.getParsedOptions());
+            const TcpOptions receivedOptions{tcp.getParsedOptions()};
+            setTcpOptions(receivedOptions);
+            setTsEcr(receivedOptions.tsVal.value());
 
             localSeqNumber_ = Tcp::generateIsn();
             sndUna_ = localSeqNumber_;
@@ -63,7 +65,9 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             localSeqNumber_ += 1;
             sndUna_ += 1;
 
-            updateTimeStamps(tcp.getParsedOptions());
+            const TcpOptions receivedOptions{tcp.getParsedOptions()};
+            setTsEcr(receivedOptions.tsVal.value());
+
 
             remoteWindow_ = tcp.getWindow();
 
@@ -76,8 +80,10 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (!validateRemoteAck(tcp))break;
             processAck(tcp);
 
-            updateTimeStamps(tcp.getParsedOptions());
+            const TcpOptions receivedOptions{tcp.getParsedOptions()};
+            setTsEcr(receivedOptions.tsVal.value());
 
+            printConnectionOptions();
 
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
@@ -168,15 +174,30 @@ std::optional<Tcp> TcpConnection::buildNextSegment() {
     return std::nullopt;
 }
 
-Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const std::span<uint8_t> payload) const {
+Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const std::span<uint8_t> payload) {
     Tcp tcp(createTcpBaseConfig());
-    tcp.setOptions({});
+    lastSentTime_ = std::chrono::steady_clock::now();
+    setTsVal(getCurrentTimeStamp());
+
+    std::vector<uint8_t> optionsBuffer{dumpTimeStampsOption()};
+    tcp.setOptions(optionsBuffer);
     tcp.setFlagByte(flags.getHexa());
 
     if (!payload.empty()) tcp.insertPayload(payload);
 
     tcp.calculateCheckSum();
     return tcp;
+}
+
+std::optional<Tcp> TcpConnection::checkRetransmission() {
+    if (sndUna_ == localSeqNumber_) return std::nullopt;
+    const auto timeNow{std::chrono::steady_clock::now()};
+
+    if (getSendElapsedTime() >= rto_) {
+        lastSentTime_ = timeNow;
+        //retransmit
+    }
+    return std::nullopt;
 }
 
 
@@ -222,6 +243,61 @@ void TcpConnection::printConnectionOptions() const {
     std::cout << '\n';
 }
 
+uint32_t TcpConnection::getSendElapsedTime() const {
+    const auto timeNow{std::chrono::steady_clock::now()};
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - lastSentTime_).count();
+
+    return static_cast<uint32_t>(elapsed);
+}
+
+void TcpConnection::recalculateRto(const uint32_t rtt) {
+    if (firstRttSample_) {
+        srtt_ = rtt;
+        rttvar_ = static_cast<double>(rtt) / 2;
+        firstRttSample_ = false;
+    } else {
+        rttvar_ = (1 - constants::RTT::beta) * rttvar_ + constants::RTT::beta * std::abs(srtt_ - rtt);
+        srtt_ = (1 - constants::RTT::alpha) * srtt_ + constants::RTT::alpha * rtt;
+    }
+    rto_ = static_cast<uint32_t>(std::clamp(srtt_ + constants::RTT::k * rttvar_, constants::RTT::rtoMin,
+                                            constants::RTT::rtoMax));
+}
+
+uint32_t TcpConnection::getTsVal() const {
+    return tcpOptions_.tsVal.value();
+}
+
+uint32_t TcpConnection::getTsEcr() const {
+    return tcpOptions_.tsEcr.value();
+}
+
+void TcpConnection::setTsVal(uint32_t ts) {
+    tcpOptions_.tsVal = ts;
+}
+
+void TcpConnection::setTsEcr(uint32_t ts) {
+    tcpOptions_.tsEcr = ts;
+}
+
+std::vector<uint8_t> TcpConnection::dumpTimeStampsOption() const {
+    using namespace net::bytes;
+
+    std::vector<uint8_t> data;
+
+    data.reserve(10);
+    data.push_back(Tcp::Option::TS);
+    data.push_back(10);
+
+    appendBytes32(getTsVal(), data);
+    appendBytes32(getTsEcr(), data);
+    return data;
+}
+
+uint32_t TcpConnection::getCurrentTimeStamp() {
+    return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
 void TcpConnection::abortConnection(Tcp &tcp) {
     tcp.abort();
     state_ = State::Closed;
@@ -254,19 +330,21 @@ void TcpConnection::setTcpOptions(const TcpOptions &tcpOptions) {
     if (tcpOptions.windowScale.has_value()) {
         tcpOptions_.windowScale = *tcpOptions.windowScale;
     }
-
-    if (tcpOptions.tsVal.has_value()) {
-        tcpOptions_.tsVal = *tcpOptions.tsVal;
-    }
-
-    if (tcpOptions.tsEcr.has_value()) {
-        tcpOptions_.tsEcr = *tcpOptions.tsEcr;
-    }
+    //
+    // if (tcpOptions.tsVal.has_value()) {
+    //     tcpOptions_.tsVal = *tcpOptions.tsVal;
+    // }
+    //
+    // if (tcpOptions.tsEcr.has_value()) {
+    //     tcpOptions_.tsEcr = *tcpOptions.tsEcr;
+    // }
 }
 
 void TcpConnection::updateTimeStamps(const TcpOptions &tcpOptions) {
     if (tcpOptions.tsVal.has_value()) {
-        tcpOptions_.tsVal = *tcpOptions.tsVal;
+        uint32_t tsVal = tcpOptions.tsVal.value();
+        tcpOptions_.tsVal = tsVal;
+        recalculateRto(getSendElapsedTime());
     }
 
     if (tcpOptions.tsEcr.has_value()) {
@@ -332,7 +410,4 @@ IpConstructConfig TcpConnection::createIpBaseConfig() const {
     config.totalLength = 0;
 
     return config;
-}
-
-std::optional<Tcp> TcpConnection::checkRetransmission() {
 }
