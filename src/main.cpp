@@ -113,11 +113,18 @@ int main() {
                         ConnectionKey connectionKey{tcp.getConnectionKey()};
 
                         TcpConnection &connection{tcpTable.getOrCreate(connectionKey)};
-
+                        static bool droppedOnce{false};
                         if (auto tcpToSend{connection.handlePacket(tcp)}; tcpToSend.has_value()) {
-                            Ip ipToSend{connection.createIpBaseConfig()};
 
+                            Ip ipToSend{connection.createIpBaseConfig()};
+                            if (droppedOnce) {
                             tunDevice.sendPacket(ipToSend, tcpToSend.value());
+                                droppedOnce = false;
+                            }else {
+                                std::cout << "dropping packet to test retransmission " << "\n";
+                                droppedOnce = true;
+
+                            }
                         }
 
                         if (connection.getState() == TcpConnection::State::Closed) {
