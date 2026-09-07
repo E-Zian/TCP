@@ -14,6 +14,18 @@
 #include <span>
 #include <poll.h>
 
+namespace {
+    void sweepRetransmissions(const TcpConnectionTable &table, const TunDevice &dev) {
+        for (auto &[key, conn]: table.getConnectionTable()) {
+            if (auto tcpToSend = conn.checkRetransmission()) {
+                Ip ipHeader{conn.createIpBaseConfig()};
+                dev.sendPacket(ipHeader, *tcpToSend);
+                std::cout << "retransmitting for connection " << net::ipToString(key.remoteIp) << "::"<<key.remotePort<< "\n";
+            }
+        }
+    }
+}
+
 int main() {
     try {
         TcpConnectionTable tcpTable{};
@@ -34,14 +46,14 @@ int main() {
                 if (errno == EINTR) continue;
                 std::perror("poll");
                 continue;
-
             };
 
-            if (fdEvents == 0) {
+            sweepRetransmissions(tcpTable, tunDevice);
 
-                continue;
-                // retransmission here
-            }
+            // if (fdEvents == 0) {
+            //     sweepRetransmissions(tcpTable, tunDevice);
+            //     continue;
+            // }
 
             if (pollFds[0].revents && (pollFds[0].revents & POLLIN)) {
                 const ssize_t bytes{tunDevice.read(buffer)};

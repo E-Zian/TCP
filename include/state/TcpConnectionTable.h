@@ -22,6 +22,9 @@ class TcpConnectionTable {
         return connectionTable_.try_emplace(key).first->second;
     }
 
+    std::unordered_map<ConnectionKey, TcpConnection> getConnectionTable() const {
+        return connectionTable_;
+    }
     private:
     std::unordered_map<ConnectionKey, TcpConnection> connectionTable_;
 };

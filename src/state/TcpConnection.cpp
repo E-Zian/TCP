@@ -27,7 +27,9 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
 
             const TcpOptions receivedOptions{tcp.getParsedOptions()};
             setTcpOptions(receivedOptions);
-            setTsEcr(receivedOptions.tsVal.value());
+            if (receivedOptions.tsVal.has_value()) {
+                setTsEcr(receivedOptions.tsVal.value());
+            }
 
             localSeqNumber_ = Tcp::generateIsn();
             sndUna_ = localSeqNumber_;
@@ -41,7 +43,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
 
             state_ = State::SynReceived;
 
-            if (auto segment{buildNextSegment()}) {
+            if (auto segment{buildSegmentToSend()}) {
                 return {segment.value()};
             }
 
@@ -65,9 +67,9 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             localSeqNumber_ += 1;
             sndUna_ += 1;
 
-            const TcpOptions receivedOptions{tcp.getParsedOptions()};
-            setTsEcr(receivedOptions.tsVal.value());
-
+            if (const TcpOptions receivedOptions{tcp.getParsedOptions()}; receivedOptions.tsVal.has_value()) {
+                setTsEcr(receivedOptions.tsVal.value());
+            }
 
             remoteWindow_ = tcp.getWindow();
 
@@ -80,10 +82,11 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             if (!validateRemoteAck(tcp))break;
             processAck(tcp);
 
-            const TcpOptions receivedOptions{tcp.getParsedOptions()};
-            setTsEcr(receivedOptions.tsVal.value());
+            if (const TcpOptions receivedOptions{tcp.getParsedOptions()}; receivedOptions.tsVal.has_value()) {
+                setTsEcr(receivedOptions.tsVal.value());
+            }
 
-            printConnectionOptions();
+            // printConnectionOptions();
 
             if (tcp.getFlags() & Tcp::Flag::RST) {
                 state_ = State::Closed;
@@ -93,12 +96,15 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
             remoteWindow_ = tcp.getWindow();
 
             if (tcp.getPayloadSize() > 0) {
-                ackOwed_ = true;
+                ackPending_ = true;
                 std::vector<uint8_t> buffer(tcp.getPayload().begin(), tcp.getPayload().end());
                 addToReceivedBuffer(buffer);
                 std::cout << "Data received from " << net::ipToString(connectionKey_.remoteIp) << "::" << connectionKey_
                         .remotePort << "\n";
                 net::displayBytesAsText(buffer);
+
+                // resend as test
+                queueSend(buffer);
 
                 localAckNumber_ += buffer.size();
             }
@@ -112,7 +118,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
                 // temp instant send fin when receive fin , change in future when have sending data
             }
 
-            return buildNextSegment();
+            return buildSegmentToSend();
 
             break;
         }
@@ -138,7 +144,7 @@ std::optional<Tcp> TcpConnection::handlePacket(Tcp &tcp) {
     return std::nullopt;
 }
 
-std::optional<Tcp> TcpConnection::buildNextSegment() {
+std::optional<Tcp> TcpConnection::buildSegmentToSend(const bool isRetransmit) {
     FlagByte<Tcp::Flag> flags;
 
     if (synAckPending_) {
@@ -146,36 +152,39 @@ std::optional<Tcp> TcpConnection::buildNextSegment() {
         flags.setFlag(Tcp::Flag::SYN);
         flags.setFlag(Tcp::Flag::ACK);
 
-        return makeSegment(flags);
+        return makeSegment(flags,isRetransmit);
     }
 
     flags.setFlag(Tcp::Flag::ACK);
 
-    if (auto payload{sendNext()}) {
+    if (auto payload{isRetransmit ? sendUnAcked() : sendNext()}) {
         flags.setFlag(Tcp::Flag::PSH);
-        ackOwed_ = false;
+        ackPending_ = false;
+        Tcp seg {makeSegment(flags, isRetransmit,payload.value())};
+        if (!isRetransmit) localSeqNumber_ += payload->size();
 
-        return makeSegment(flags, payload.value());
+        return seg;
     }
 
     if (finPending_) {
         flags.setFlag(Tcp::Flag::FIN);
-        ackOwed_ = false;
+        ackPending_ = false;
         finPending_ = false;
-        return makeSegment(flags);
+        return makeSegment(flags,isRetransmit);
     }
 
-    if (ackOwed_) {
-        ackOwed_ = false;
+    if (ackPending_) {
+        ackPending_ = false;
 
-        return makeSegment(flags);
+        return makeSegment(flags,isRetransmit);
     }
 
     return std::nullopt;
 }
 
-Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const std::span<uint8_t> payload) {
-    Tcp tcp(createTcpBaseConfig());
+
+Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const bool isRetransmit, const std::span<uint8_t> payload) {
+    Tcp tcp(createTcpBaseConfig(isRetransmit));
     lastSentTime_ = std::chrono::steady_clock::now();
     setTsVal(getCurrentTimeStamp());
 
@@ -183,20 +192,48 @@ Tcp TcpConnection::makeSegment(const FlagByte<Tcp::Flag> flags, const std::span<
     tcp.setOptions(optionsBuffer);
     tcp.setFlagByte(flags.getHexa());
 
-    if (!payload.empty()) tcp.insertPayload(payload);
+    if (!payload.empty()) {
+        tcp.insertPayload(payload);
+
+    }
 
     tcp.calculateCheckSum();
     return tcp;
 }
 
 std::optional<Tcp> TcpConnection::checkRetransmission() {
-    if (sndUna_ == localSeqNumber_) return std::nullopt;
+
+    const bool dataOutstanding = sndUna_ < localSeqNumber_;
+    const bool controlOutstanding = (state_ == State::SynReceived || state_ == State::TearingDown);
+
+    if (!dataOutstanding && !controlOutstanding) {
+        return std::nullopt;
+    }
+
+    constexpr bool isRetransmit {true};
     const auto timeNow{std::chrono::steady_clock::now()};
 
-    if (getSendElapsedTime() >= rto_) {
-        lastSentTime_ = timeNow;
-        //retransmit
+    if (getSendElapsedTime() < rto_) {
+        return std::nullopt;
     }
+
+    rto_ = std::min(rto_ * 2, static_cast<uint32_t>(constants::RTT::rtoMax));
+
+    lastSentTime_ = timeNow;
+
+
+    if (state_ == TcpConnection::State::SynReceived) {
+        synAckPending_ = true;
+    }
+
+    if (state_ == TcpConnection::State::TearingDown) {
+        finPending_ = true;
+    }
+
+    if (auto segment{buildSegmentToSend(isRetransmit)}) {
+        return {segment.value()};
+    }
+
     return std::nullopt;
 }
 
@@ -221,10 +258,24 @@ std::optional<std::vector<uint8_t> > TcpConnection::sendNext() {
                                 sendBuffer_.begin() + static_cast<long>(sizeToSend) + static_cast<long>(bufferBegin));
 
 
-    localSeqNumber_ += sizeToSend;
 
     return buffer;
 }
+
+std::optional<std::vector<uint8_t>> TcpConnection::sendUnAcked() {
+    if (sndUna_ >= localSeqNumber_) return std::nullopt;
+
+    const uint8_t scale = tcpOptions_.windowScale.value_or(0);
+    const uint32_t scaledWindow = remoteWindow_ << scale;
+    const uint32_t mss = tcpOptions_.mss.value_or(536);
+
+    const size_t sizeToSend = std::min({localSeqNumber_ - sndUna_, scaledWindow, mss});
+
+    std::vector<uint8_t> buffer(sendBuffer_.begin(), sendBuffer_.begin() + static_cast<long>(sizeToSend) );
+
+    return buffer;
+}
+
 
 void TcpConnection::printConnectionOptions() const {
     tcpOptions_.mss.has_value()
@@ -295,7 +346,7 @@ std::vector<uint8_t> TcpConnection::dumpTimeStampsOption() const {
 
 uint32_t TcpConnection::getCurrentTimeStamp() {
     return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::steady_clock::now().time_since_epoch()).count());
+        std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
 void TcpConnection::abortConnection(Tcp &tcp) {
@@ -303,14 +354,14 @@ void TcpConnection::abortConnection(Tcp &tcp) {
     state_ = State::Closed;
 }
 
-TcpConstructConfig TcpConnection::createTcpBaseConfig() const {
+TcpConstructConfig TcpConnection::createTcpBaseConfig(bool isRetransmit) const {
     TcpConstructConfig config{};
 
     config.sourceIP = connectionKey_.localIp;
     config.destinationIP = connectionKey_.remoteIp;
     config.sourcePort = connectionKey_.localPort;
     config.destinationPort = connectionKey_.remotePort;
-    config.seqNum = localSeqNumber_;
+    config.seqNum = isRetransmit ? sndUna_:localSeqNumber_;
     config.ackNum = localAckNumber_;
     config.windowSize = localWindow_;
     config.urgentPtr = 0;
@@ -330,27 +381,8 @@ void TcpConnection::setTcpOptions(const TcpOptions &tcpOptions) {
     if (tcpOptions.windowScale.has_value()) {
         tcpOptions_.windowScale = *tcpOptions.windowScale;
     }
-    //
-    // if (tcpOptions.tsVal.has_value()) {
-    //     tcpOptions_.tsVal = *tcpOptions.tsVal;
-    // }
-    //
-    // if (tcpOptions.tsEcr.has_value()) {
-    //     tcpOptions_.tsEcr = *tcpOptions.tsEcr;
-    // }
 }
 
-void TcpConnection::updateTimeStamps(const TcpOptions &tcpOptions) {
-    if (tcpOptions.tsVal.has_value()) {
-        uint32_t tsVal = tcpOptions.tsVal.value();
-        tcpOptions_.tsVal = tsVal;
-        recalculateRto(getSendElapsedTime());
-    }
-
-    if (tcpOptions.tsEcr.has_value()) {
-        tcpOptions_.tsEcr = *tcpOptions.tsEcr;
-    }
-}
 
 void TcpConnection::processAck(const Tcp &tcp) {
     const uint32_t ack = tcp.getAckNumber();
@@ -362,6 +394,8 @@ void TcpConnection::processAck(const Tcp &tcp) {
     if (acked > sendBuffer_.size()) return;
 
     sndUna_ = ack;
+
+    recalculateRto(getSendElapsedTime());
 
     sendBuffer_.erase(sendBuffer_.begin(), sendBuffer_.begin() + static_cast<long>(acked));
 }

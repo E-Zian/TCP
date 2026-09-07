@@ -30,7 +30,7 @@ public:
 
     void queueSend(std::span<uint8_t> buffer);
 
-    std::optional<Tcp> buildNextSegment();
+    std::optional<Tcp> buildSegmentToSend(bool isRetransmit = false);
 
     [[nodiscard]] IpConstructConfig createIpBaseConfig() const;
 
@@ -57,13 +57,13 @@ private:
 
     bool synAckPending_{};
 
-    bool ackOwed_{};
+    bool ackPending_{};
 
     bool finPending_{};
 
     std::chrono::time_point<std::chrono::steady_clock> lastSentTime_{std::chrono::steady_clock::now()};
 
-    uint32_t rto_{};
+    uint32_t rto_{1000};
 
     double srtt_{};
 
@@ -81,15 +81,15 @@ private:
 
     void setTcpOptions(const TcpOptions &tcpOptions);
 
-    void updateTimeStamps(const TcpOptions &tcpOptions);
-
     void processAck(const Tcp &tcp);
 
-    [[nodiscard]] Tcp makeSegment(FlagByte<Tcp::Flag> flags, std::span<uint8_t> payload = {});
+    [[nodiscard]] Tcp makeSegment(FlagByte<Tcp::Flag> flags,bool isRetransmit, std::span<uint8_t> payload = {});
 
-    [[nodiscard]] TcpConstructConfig createTcpBaseConfig() const;
+    [[nodiscard]] TcpConstructConfig createTcpBaseConfig(bool isRetransmit = false) const;
 
     std::optional<std::vector<uint8_t> > sendNext();
+
+    std::optional<std::vector<uint8_t>> sendUnAcked();
 
     void printConnectionOptions() const;
 
